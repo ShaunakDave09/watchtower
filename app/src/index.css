@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+
+  --color-page: #eee9de;
+  --color-canvas: #f7f4ee;
+  --color-card: #fffdf9;
+  --color-card-soft: #f9f5ef;
+  --color-border: #ece4d6;
+  --color-border-strong: #e7ded0;
+  --color-hairline: #f3ede2;
+
+  --color-ink: #2a2018;
+  --color-ink-soft: #5a4d3d;
+  --color-body: #6e5f4d;
+  --color-muted: #a08a6c;
+  --color-faint: #b7a88c;
+  --color-quiet: #d9cfc0;
+
+  --color-accent: #c1502e;
+  --color-accent-light: #d1622e;
+  --color-accent-hover: #b0441f;
+  --color-accent-soft: #f6e9e0;
+  --color-accent-chip: #f3ede2;
+
+  --color-danger: #c0392b;
+  --color-danger-soft: #fff5f3;
+  --color-danger-border: #f0d4cc;
+  --color-warning: #e6a817;
+  --color-warning-soft: #fffbf0;
+  --color-warning-border: #ece0b8;
+  --color-success: #15803d;
+
+  --color-dark: #2a2018;
+  --color-dark-soft: #3f342a;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-page);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
