@@ -45,11 +45,11 @@ export default function FilterModal({ filters, options }: FilterModalProps) {
   return (
     <div
       onClick={() => filters.setOpen(false)}
-      className="absolute inset-0 z-[100] flex items-center justify-center bg-[rgba(42,32,24,0.5)] p-6"
+      className="fixed inset-0 z-[100] flex items-start justify-center bg-[rgba(42,32,24,0.5)] p-6 pt-0"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="max-h-[88vh] w-[568px] max-w-full overflow-auto rounded-[18px] border border-[var(--color-border-strong)] bg-[var(--color-card)] shadow-[0_30px_80px_-20px_rgba(20,16,12,0.5)]"
+        className="w-[820px] max-w-full origin-top animate-[drawer-drop_0.2s_ease-out] rounded-b-[18px] rounded-t-none border border-t-0 border-[var(--color-border-strong)] bg-[var(--color-card)] shadow-[0_30px_80px_-20px_rgba(20,16,12,0.5)]"
       >
         <div className="flex items-center gap-3 border-b border-[var(--color-border)] px-6 py-5">
           <div className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[9px] bg-[var(--color-accent-soft)]">
@@ -72,7 +72,7 @@ export default function FilterModal({ filters, options }: FilterModalProps) {
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-x-4 gap-y-[15px] px-6 py-[22px]">
+        <div className="grid grid-cols-3 gap-x-4 gap-y-[15px] px-6 py-[22px]">
           <FieldSelect label="BUSINESS" value={filters.filters.business} options={options.business} onChange={(v) => filters.set("business", v)} />
           <FieldSelect label="PRODUCT" value={filters.filters.product} options={options.product} onChange={(v) => filters.set("product", v)} />
           <FieldSelect label="SUB-PRODUCT" value={filters.filters.subProduct} options={options.subProduct} onChange={(v) => filters.set("subProduct", v)} />
@@ -98,7 +98,7 @@ export default function FilterModal({ filters, options }: FilterModalProps) {
             </div>
           </div>
 
-          <div className="col-span-2">
+          <div className="col-span-3">
             <span className="mb-[5px] block font-mono text-[10px] tracking-[0.05em] text-[var(--color-muted)]">
               DATE RANGE
             </span>

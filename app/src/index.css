@@ -5,7 +5,7 @@
   --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
 
   --color-page: #eee9de;
-  --color-canvas: #f7f4ee;
+  --color-canvas: #f7f4ef;
   --color-card: #fffdf9;
   --color-card-soft: #f9f5ef;
   --color-border: #ece4d6;
@@ -49,4 +49,15 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+@keyframes drawer-drop {
+  from {
+    transform: translateY(-16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
