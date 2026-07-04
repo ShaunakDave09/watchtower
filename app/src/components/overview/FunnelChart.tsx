@@ -27,22 +27,22 @@ export default function FunnelChart({ steps }: { steps: FunnelStep[] }) {
     <svg viewBox={`0 0 620 ${height}`} width="100%" style={{ display: "block" }}>
       <defs>
         <linearGradient id="fc-accent" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#d1622e" />
-          <stop offset="1" stopColor="#c1502e" />
+          <stop offset="0" stopColor="var(--color-accent-light)" />
+          <stop offset="1" stopColor="var(--color-accent)" />
         </linearGradient>
         <linearGradient id="fc-final" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#3f342a" />
-          <stop offset="1" stopColor="#2a2018" />
+          <stop offset="0" stopColor="var(--color-dark-soft)" />
+          <stop offset="1" stopColor="var(--color-dark)" />
         </linearGradient>
       </defs>
 
-      <g fill="#f3ede2">
+      <g fill="var(--color-border)">
         {rows.map((r) => (
           <rect key={r.step.step} x={TRACK_X} y={r.y} width={TRACK_W} height={ROW_H} rx={7} />
         ))}
       </g>
 
-      <g fill="#c1502e" fillOpacity={0.13}>
+      <g fill="var(--color-accent)" fillOpacity={0.13}>
         {rows.slice(0, -1).map((r, i) => {
           const next = rows[i + 1];
           const bottomY = r.y + ROW_H;
@@ -92,7 +92,7 @@ export default function FunnelChart({ steps }: { steps: FunnelStep[] }) {
         {rows[rows.length - 1].step.users.toLocaleString()}
       </text>
 
-      <g fontFamily="'IBM Plex Sans',system-ui,sans-serif" fontSize={12.5} fontWeight={500} fill="#5a4d3d" textAnchor="end">
+      <g fontFamily="'IBM Plex Sans',system-ui,sans-serif" fontSize={12.5} fontWeight={500} fill="var(--color-ink-soft)" textAnchor="end">
         {rows.map((r) => (
           <text key={r.step.step} x={108} y={r.y + 34}>
             {r.step.label}
@@ -100,7 +100,7 @@ export default function FunnelChart({ steps }: { steps: FunnelStep[] }) {
         ))}
       </g>
 
-      <g fontFamily="'IBM Plex Mono',ui-monospace,monospace" fontSize={11.5} fontWeight={600} fill="#c0392b" textAnchor="start">
+      <g fontFamily="'IBM Plex Mono',ui-monospace,monospace" fontSize={11.5} fontWeight={600} fill="var(--color-danger)" textAnchor="start">
         {rows.slice(1).map((r) => (
           <text key={r.step.step} x={574} y={r.y - ROW_GAP / 2 + 4}>
             ↓{r.step.dropPct}%

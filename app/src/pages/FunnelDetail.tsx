@@ -63,7 +63,7 @@ export default function FunnelDetail() {
           className="inline-flex items-center gap-[6px] rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-card)] px-3 py-[6px] text-[12px] font-medium text-[var(--color-body)] hover:bg-[var(--color-accent-soft)]"
         >
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-            <path d="M10 3L5 8l5 5" stroke="#6e5f4d" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M10 3L5 8l5 5" stroke="var(--color-body)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           Back to Overview
         </button>
@@ -94,7 +94,7 @@ export default function FunnelDetail() {
           </div>
           <button className="inline-flex items-center gap-[7px] rounded-[9px] border border-[var(--color-border-strong)] bg-[var(--color-card)] px-[14px] py-[7px] text-[12px] font-medium text-[var(--color-ink)] hover:bg-[var(--color-accent-soft)]">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <path d="M8 2v12M2 8h12" stroke="#c1502e" strokeWidth="1.5" strokeLinecap="round" />
+              <path d="M8 2v12M2 8h12" stroke="var(--color-accent)" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
             Compare
           </button>

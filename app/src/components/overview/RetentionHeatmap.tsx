@@ -45,7 +45,7 @@ export default function RetentionHeatmap({ weekLabels, cohorts, callout }: Reten
           </Fragment>
         ))}
       </div>
-      <div className="mt-[14px] text-[12px] text-[#8a7a66]">{callout}</div>
+      <div className="mt-[14px] text-[12px] text-[var(--color-muted)]">{callout}</div>
     </div>
   );
 }

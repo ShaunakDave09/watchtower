@@ -4,7 +4,7 @@ const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
 function dayClasses(day: CalendarDay) {
   if (day.isStart || day.isEnd) return "bg-[var(--color-accent)] text-white font-semibold rounded-lg";
-  if (day.inRange) return "bg-[#f7e2d6] rounded-sm";
+  if (day.inRange) return "bg-[var(--color-accent-soft)] rounded-sm";
   return "rounded-lg hover:bg-[var(--color-accent-chip)]";
 }
 
@@ -22,7 +22,7 @@ export default function CalendarMonth({ label, days, onPrev, onNext }: CalendarM
         {onPrev ? (
           <button
             onClick={onPrev}
-            className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] border border-[var(--color-border-strong)] bg-white text-[14px] leading-none text-[var(--color-body)] hover:bg-[var(--color-accent-soft)]"
+            className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] border border-[var(--color-border-strong)] bg-[var(--color-card)] text-[14px] leading-none text-[var(--color-body)] hover:bg-[var(--color-accent-soft)]"
           >
             ‹
           </button>
@@ -33,7 +33,7 @@ export default function CalendarMonth({ label, days, onPrev, onNext }: CalendarM
         {onNext ? (
           <button
             onClick={onNext}
-            className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] border border-[var(--color-border-strong)] bg-white text-[14px] leading-none text-[var(--color-body)] hover:bg-[var(--color-accent-soft)]"
+            className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] border border-[var(--color-border-strong)] bg-[var(--color-card)] text-[14px] leading-none text-[var(--color-body)] hover:bg-[var(--color-accent-soft)]"
           >
             ›
           </button>

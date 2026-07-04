@@ -85,7 +85,7 @@ export default function UserTable({
         <div className="flex gap-1">
           <button
             onClick={() => setPage((p) => Math.max(1, p - 1))}
-            className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-[var(--color-border-strong)] bg-white text-[12px] text-[var(--color-faint)]"
+            className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-[var(--color-border-strong)] bg-[var(--color-card)] text-[12px] text-[var(--color-faint)]"
           >
             ‹
           </button>
@@ -96,19 +96,19 @@ export default function UserTable({
               className={`flex h-7 w-7 items-center justify-center rounded-[6px] border font-mono text-[10px] ${
                 page === n
                   ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-white"
-                  : "border-[var(--color-border-strong)] bg-white text-[var(--color-body)] hover:bg-[var(--color-accent-soft)]"
+                  : "border-[var(--color-border-strong)] bg-[var(--color-card)] text-[var(--color-body)] hover:bg-[var(--color-accent-soft)]"
               }`}
             >
               {n}
             </button>
           ))}
           <div className="flex h-7 w-7 items-center justify-center font-mono text-[10px] text-[var(--color-faint)]">…</div>
-          <button className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-[var(--color-border-strong)] bg-white font-mono text-[10px] text-[var(--color-body)] hover:bg-[var(--color-accent-soft)]">
+          <button className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-[var(--color-border-strong)] bg-[var(--color-card)] font-mono text-[10px] text-[var(--color-body)] hover:bg-[var(--color-accent-soft)]">
             {pageCount}
           </button>
           <button
             onClick={() => setPage((p) => p + 1)}
-            className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-[var(--color-border-strong)] bg-white text-[12px] text-[var(--color-body)] hover:bg-[var(--color-accent-soft)]"
+            className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-[var(--color-border-strong)] bg-[var(--color-card)] text-[12px] text-[var(--color-body)] hover:bg-[var(--color-accent-soft)]"
           >
             ›
           </button>

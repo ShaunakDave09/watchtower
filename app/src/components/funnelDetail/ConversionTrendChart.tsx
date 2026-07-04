@@ -25,19 +25,19 @@ export default function ConversionTrendChart({ points }: { points: TrendPoint[] 
       <div className="mb-1 text-[15px] font-semibold text-[var(--color-ink)]">Conversion trend</div>
       <div className="mb-[14px] font-mono text-[10px] text-[var(--color-faint)]">END-TO-END · LAST 8 WEEKS</div>
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }}>
-        <g stroke="#f3ede2" strokeWidth={0.5}>
+        <g stroke="var(--color-border)" strokeWidth={0.5}>
           <line x1={0} y1={25} x2={W} y2={25} />
           <line x1={0} y1={50} x2={W} y2={50} />
           <line x1={0} y1={75} x2={W} y2={75} />
         </g>
-        <polyline points={linePoints} fill="none" stroke="#c1502e" strokeWidth={2} strokeLinejoin="round" />
-        <g fill="#c1502e">
+        <polyline points={linePoints} fill="none" stroke="var(--color-accent)" strokeWidth={2} strokeLinejoin="round" />
+        <g fill="var(--color-accent)">
           {points.map((p, i) => {
             const [x, y] = toXY(i, p.value);
             return <circle key={p.week} cx={x} cy={y} r={3} />;
           })}
         </g>
-        <g fontFamily="'IBM Plex Mono',ui-monospace,monospace" fontSize={8} fill="#b7a88c">
+        <g fontFamily="'IBM Plex Mono',ui-monospace,monospace" fontSize={8} fill="var(--color-faint)">
           {points.map((p, i) => {
             const x = i === points.length - 1 ? i * step - 4 : i * step;
             return (

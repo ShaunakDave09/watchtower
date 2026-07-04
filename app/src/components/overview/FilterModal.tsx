@@ -26,7 +26,7 @@ function FieldSelect({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full cursor-pointer rounded-lg border border-[var(--color-border-strong)] bg-white px-[10px] py-2 text-[13px] text-[var(--color-ink)]"
+        className="w-full cursor-pointer rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-card)] px-[10px] py-2 text-[13px] text-[var(--color-ink)]"
       >
         {options.map((opt) => (
           <option key={opt}>{opt}</option>
@@ -54,7 +54,7 @@ export default function FilterModal({ filters, options }: FilterModalProps) {
         <div className="flex items-center gap-3 border-b border-[var(--color-border)] px-6 py-5">
           <div className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[9px] bg-[var(--color-accent-soft)]">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M1.5 3h13M4 8h8M6.5 13h3" stroke="#c1502e" strokeWidth="1.6" strokeLinecap="round" />
+              <path d="M1.5 3h13M4 8h8M6.5 13h3" stroke="var(--color-accent)" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
           </div>
           <div>
@@ -66,7 +66,7 @@ export default function FilterModal({ filters, options }: FilterModalProps) {
           <div className="flex-1" />
           <button
             onClick={() => filters.setOpen(false)}
-            className="flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-[var(--color-border-strong)] bg-white text-[15px] leading-none text-[var(--color-body)] hover:bg-[var(--color-accent-soft)]"
+            className="flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-card)] text-[15px] leading-none text-[var(--color-body)] hover:bg-[var(--color-accent-soft)]"
           >
             ✕
           </button>
@@ -103,15 +103,15 @@ export default function FilterModal({ filters, options }: FilterModalProps) {
               DATE RANGE
             </span>
             <div className="mb-3 flex items-center gap-[10px]">
-              <div className="min-w-0 flex-1 rounded-lg border border-[var(--color-border-strong)] bg-white px-[10px] py-[9px] font-mono text-[12px] text-[var(--color-ink)]">
+              <div className="min-w-0 flex-1 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-card)] px-[10px] py-[9px] font-mono text-[12px] text-[var(--color-ink)]">
                 {filters.fromLabel}
               </div>
               <span className="text-[var(--color-muted)]">–</span>
-              <div className="min-w-0 flex-1 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-card-soft)] px-[10px] py-[9px] font-mono text-[12px] text-[#8a7a66]">
+              <div className="min-w-0 flex-1 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-card-soft)] px-[10px] py-[9px] font-mono text-[12px] text-[var(--color-muted)]">
                 {filters.toLabel}
               </div>
             </div>
-            <div className="flex gap-[22px] rounded-xl border border-[var(--color-border-strong)] bg-white p-4">
+            <div className="flex gap-[22px] rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-card)] p-4">
               <CalendarMonth label={filters.monthLabelLeft} days={filters.daysLeft} onPrev={filters.prevMonth} />
               <CalendarMonth label={filters.monthLabelRight} days={filters.daysRight} onNext={filters.nextMonth} />
             </div>
@@ -125,7 +125,7 @@ export default function FilterModal({ filters, options }: FilterModalProps) {
           <div className="flex-1" />
           <button
             onClick={() => filters.setOpen(false)}
-            className="rounded-[9px] border border-[var(--color-border-strong)] bg-white px-[18px] py-[9px] text-[13px] font-medium text-[var(--color-body)]"
+            className="rounded-[9px] border border-[var(--color-border-strong)] bg-[var(--color-card)] px-[18px] py-[9px] text-[13px] font-medium text-[var(--color-body)]"
           >
             Cancel
           </button>

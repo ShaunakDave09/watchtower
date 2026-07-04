@@ -37,6 +37,40 @@
   --color-dark-soft: #3f342a;
 }
 
+.dark {
+  --color-page: #171310;
+  --color-canvas: #1b1713;
+  --color-card: #241f19;
+  --color-card-soft: #2b2520;
+  --color-border: #362f27;
+  --color-border-strong: #423931;
+  --color-hairline: #2f2a23;
+
+  --color-ink: #f0e8db;
+  --color-ink-soft: #d6cab8;
+  --color-body: #b9ab96;
+  --color-muted: #93856f;
+  --color-faint: #8a7c65;
+  --color-quiet: #4a4136;
+
+  --color-accent: #e0693f;
+  --color-accent-light: #e8794f;
+  --color-accent-hover: #ef8657;
+  --color-accent-soft: #3a2a1f;
+  --color-accent-chip: #332920;
+
+  --color-danger: #e2604c;
+  --color-danger-soft: #3a231e;
+  --color-danger-border: #5c352c;
+  --color-warning: #e8bd57;
+  --color-warning-soft: #3a331e;
+  --color-warning-border: #5c4c2c;
+  --color-success: #34c76f;
+
+  --color-dark: #100c09;
+  --color-dark-soft: #221c16;
+}
+
 html,
 body,
 #root {
@@ -49,6 +83,7 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 @keyframes drawer-drop {

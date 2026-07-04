@@ -66,8 +66,8 @@ export default function StagesTable({ stages }: { stages: FunnelStep[] }) {
                     background: stage.worst
                       ? "var(--color-danger)"
                       : isLast
-                        ? "linear-gradient(90deg,#3f342a,#2a2018)"
-                        : "linear-gradient(90deg,#d1622e,#c1502e)",
+                        ? "linear-gradient(90deg,var(--color-dark-soft),var(--color-dark))"
+                        : "linear-gradient(90deg,var(--color-accent-light),var(--color-accent))",
                   }}
                 />
               </div>
