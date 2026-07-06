@@ -61,10 +61,12 @@ export const overviewData: OverviewData = {
     title: "Signup → Paid funnel",
     convPct: "19.4%",
     steps: [
-      { step: 1, label: "Visited", users: 24810, convPct: 100, dropPct: null },
-      { step: 2, label: "Signed up", users: 15380, convPct: 62, dropPct: 38 },
-      { step: 3, label: "Activated", users: 9070, convPct: 37, dropPct: 41 },
-      { step: 4, label: "Paid", users: 4810, convPct: 19, dropPct: 47 },
+      { step: 1, label: "Entrypoint", users: 24810, convPct: 100, dropPct: null },
+      { step: 2, label: "PDP Viewed", users: 15380, convPct: 62, dropPct: 38 },
+      { step: 3, label: "PDP Clicked", users: 9070, convPct: 37, dropPct: 41 },
+      { step: 4, label: "F1 Viewed", users: 4810, convPct: 19, dropPct: 47 },
+      { step: 4, label: "F1 Submitted", users: 2405, convPct: 9.6, dropPct: 50 },
+
     ],
   },
   retention: {

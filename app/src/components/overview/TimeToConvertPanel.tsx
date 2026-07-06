@@ -34,7 +34,7 @@ export default function TimeToConvertPanel({
                   <div className="flex w-[10px] flex-none justify-center">
                     <div className="w-[1.5px] bg-[var(--color-border-strong)]" />
                   </div>
-                  <div className="flex flex-1 items-center gap-2 py-[6px]">
+                  <div className="flex flex-1 items-center gap-2 py-[3px]">
                     <div className="h-[6px] flex-1 overflow-hidden rounded-[3px] bg-[var(--color-hairline)]">
                       <div
                         className="h-full rounded-[3px]"
@@ -58,7 +58,7 @@ export default function TimeToConvertPanel({
           );
         })}
       </div>
-      <div className="mt-[14px] flex items-baseline gap-[6px] border-t border-[var(--color-border)] pt-3">
+      <div className="mt-2 flex items-baseline gap-[6px] border-t border-[var(--color-border)] pt-2">
         <div className="font-mono text-[10px] tracking-[0.07em] text-[var(--color-muted)]">TOTAL</div>
         <div className="text-[18px] font-bold text-[var(--color-ink)]">{totalLabel}</div>
         <div className="ml-auto font-mono text-[11px] text-[var(--color-success)]">{totalDelta}</div>

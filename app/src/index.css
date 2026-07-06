@@ -33,8 +33,9 @@
   --color-warning-border: #ece0b8;
   --color-success: #15803d;
 
-  --color-dark: #2a2018;
-  --color-dark-soft: #3f342a;
+  --color-dark: #1c8f4a;
+  --color-dark-soft: #34c76f;
+  --color-callout: #2a2018;
 }
 
 .dark {
@@ -67,8 +68,9 @@
   --color-warning-border: #5c4c2c;
   --color-success: #34c76f;
 
-  --color-dark: #100c09;
-  --color-dark-soft: #221c16;
+  --color-dark: #1c8f4a;
+  --color-dark-soft: #34c76f;
+  --color-callout: #4a3c2c;
 }
 
 html,

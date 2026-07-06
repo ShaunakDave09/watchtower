@@ -2,9 +2,9 @@ import type { FunnelStep } from "../../api/types";
 
 const TRACK_X = 120;
 const TRACK_W = 440;
-const ROW_H = 60;
-const ROW_GAP = 44;
-const TOP_PAD = 20;
+const ROW_H = 48;
+const ROW_GAP = 30;
+const TOP_PAD = 14;
 
 interface Row {
   step: FunnelStep;
@@ -32,7 +32,8 @@ export default function FunnelChart({ steps }: { steps: FunnelStep[] }) {
         </linearGradient>
         <linearGradient id="fc-final" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="var(--color-dark-soft)" />
-          <stop offset="1" stopColor="var(--color-dark)" />
+          <stop offset="1" stopColor="var(--color-dark)" /> 
+
         </linearGradient>
       </defs>
 
@@ -69,32 +70,32 @@ export default function FunnelChart({ steps }: { steps: FunnelStep[] }) {
 
       <g fontFamily="'IBM Plex Sans',system-ui,sans-serif" fontWeight={700} fill="#fff" textAnchor="middle">
         {rows.map((r) => (
-          <text key={r.step.step} x={340} y={r.y + 29} fontSize={r === rows[rows.length - 1] ? 16 : 19}>
+          <text key={r.step.step} x={340} y={r.y + 23} fontSize={r === rows[rows.length - 1] ? 14 : 16}>
             {r.step.convPct}%
           </text>
         ))}
       </g>
-      <g fontFamily="'IBM Plex Mono',ui-monospace,monospace" fontSize={10.5} fill="#ffe0cf" textAnchor="middle">
+      <g fontFamily="'IBM Plex Mono',ui-monospace,monospace" fontSize={9.5} fill="#ffe0cf" textAnchor="middle">
         {rows.slice(0, -1).map((r) => (
-          <text key={r.step.step} x={340} y={r.y + 47}>
+          <text key={r.step.step} x={340} y={r.y + 38}>
             {r.step.users.toLocaleString()}
           </text>
         ))}
       </g>
       <text
         x={340}
-        y={rows[rows.length - 1].y + 46}
+        y={rows[rows.length - 1].y + 37}
         fontFamily="'IBM Plex Mono',ui-monospace,monospace"
-        fontSize={9.5}
+        fontSize={8.5}
         fill="#e6dbcb"
         textAnchor="middle"
       >
         {rows[rows.length - 1].step.users.toLocaleString()}
       </text>
 
-      <g fontFamily="'IBM Plex Sans',system-ui,sans-serif" fontSize={12.5} fontWeight={500} fill="var(--color-ink-soft)" textAnchor="end">
+      <g fontFamily="'IBM Plex Sans',system-ui,sans-serif" fontSize={11.5} fontWeight={500} fill="var(--color-ink-soft)" textAnchor="end">
         {rows.map((r) => (
-          <text key={r.step.step} x={108} y={r.y + 34}>
+          <text key={r.step.step} x={108} y={r.y + 27}>
             {r.step.label}
           </text>
         ))}

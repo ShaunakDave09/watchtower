@@ -21,7 +21,7 @@ export default function RetentionHeatmap({ weekLabels, cohorts, callout }: Reten
   return (
     <div>
       <div
-        className="grid items-center gap-[5px]"
+        className="grid items-center gap-1"
         style={{ gridTemplateColumns: `auto repeat(${weekLabels.length}, 1fr)` }}
       >
         <div />
@@ -36,7 +36,7 @@ export default function RetentionHeatmap({ weekLabels, cohorts, callout }: Reten
             {cohort.values.map((v, i) => (
               <div
                 key={i}
-                className="flex h-7 items-center justify-center rounded-[5px] font-mono text-[9px]"
+                className="flex h-6 items-center justify-center rounded-[5px] font-mono text-[9px]"
                 style={cellStyle(v)}
               >
                 {v ?? ""}
@@ -45,7 +45,7 @@ export default function RetentionHeatmap({ weekLabels, cohorts, callout }: Reten
           </Fragment>
         ))}
       </div>
-      <div className="mt-[14px] text-[12px] text-[var(--color-muted)]">{callout}</div>
+      <div className="mt-2 text-[12px] text-[var(--color-muted)]">{callout}</div>
     </div>
   );
 }
