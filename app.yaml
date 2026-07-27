@@ -1,1 +1,10 @@
 command: ["python", "-m", "server.app"]
+
+env:
+  # Name of the Lakebase database instance, used to mint Postgres OAuth
+  # credentials via the Databricks SDK. PGHOST/PGPORT/PGDATABASE/PGUSER/
+  # PGSSLMODE are injected automatically once the instance is attached to
+  # this app as a resource (App page -> Configure -> + Add resource ->
+  # Database) — they don't go here.
+  - name: "LAKEBASE_INSTANCE_NAME"
+    value: "datbricks_postgres"

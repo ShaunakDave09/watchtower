@@ -12,11 +12,18 @@ export function fetchFilterOptions(): Promise<FilterOptions> {
   return getJson("/api/filters");
 }
 
-export function fetchOverview(_filters: FilterState): Promise<OverviewData> {
-  // The backend serves static fixtures regardless of filters for now; scoping
-  // KPIs/funnel/retention to the selected filters is a follow-up once real
-  // data is wired in.
-  return getJson("/api/overview");
+export function fetchOverview(filters: FilterState): Promise<OverviewData> {
+  const params = new URLSearchParams({
+    business: filters.business,
+    product: filters.product,
+    subProduct: filters.subProduct,
+    journey: filters.journey,
+    platform: filters.platform,
+    version: filters.version,
+    from: filters.from,
+    to: filters.to,
+  });
+  return getJson(`/api/overview?${params}`);
 }
 
 export function fetchFunnelDetail(funnelId: string): Promise<FunnelDetailData> {

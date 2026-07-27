@@ -40,16 +40,57 @@ not committed.
 
 ## Data
 
-`/api/filters`, `/api/overview`, and `/api/funnels/{id}` currently read from
-static JSON fixtures in `server/fixtures/`, mirroring what was previously
-mocked client-side. Swapping these for real Databricks SQL warehouse /
-Unity Catalog queries (via the Databricks SDK) is a follow-up — the router
-functions in `server/routers/` are the place to make that change without
-touching the frontend.
+The funnel stage/conversion breakdown — `funnel.steps` in `/api/overview` and
+`stages` in `/api/funnels/{id}` — is a real query against a Lakebase Postgres
+table (`server/queries.py`), synced from the Delta gold table
+`bfl_std_lake.digital360.horizontal_summary_daily`. Everything else on those
+endpoints (KPIs, retention, time-to-convert, drop-off reasons, trend,
+App-vs-Web comparison, the user table) still reads from static JSON fixtures
+in `server/fixtures/`, since there's no source table for them yet.
+
+### Lakebase setup (one-time, done in the Databricks workspace UI)
+
+1. **Sync the Delta table**: Catalog Explorer → open
+   `bfl_std_lake.digital360.horizontal_summary_daily` → **Create** →
+   **Synced table** → target the `datbricks_postgres` Lakebase instance.
+   The table has no primary key, so pick a composite key that makes rows
+   unique — likely `business, product, sub_product, journey_name,
+   ep_platform, entrypoint_stage, stage_order, date`.
+2. **Attach the database as an app resource**: on the app's page in the
+   Databricks Apps UI → **Configure** → **+ Add resource** → **Database** →
+   pick the `datbricks_postgres` instance. This grants the app's service
+   principal `CONNECT`/`CREATE` on the database and injects `PGHOST`,
+   `PGPORT`, `PGDATABASE`, `PGUSER`, `PGSSLMODE` into the app's environment
+   automatically — don't set those yourself in `app.yaml`.
+
+`server/db.py` mints short-lived Postgres OAuth tokens via the Databricks
+SDK (`WorkspaceClient().database.generate_database_credential`), scoped to
+the instance named in the `LAKEBASE_INSTANCE_NAME` env var in `app.yaml`
+(currently `datbricks_postgres` — fix that in `app.yaml` if it's a typo for
+your actual instance name). Tokens are cached and refreshed automatically
+before they expire.
+
+`HORIZONTAL_SUMMARY_TABLE` (`server/queries.py`, default
+`digital360.horizontal_summary_daily`) is the schema-qualified Postgres name
+of the synced table — override via env var if you name it differently.
+
+### Known gap
+
+`/api/overview`'s `business`/`product`/`subProduct`/`journey`/`platform`/
+`version`/`from`/`to` query params are all required — if the frontend's date
+picker sends a blank `to` (which happens mid-selection, before the end date
+is clicked), the query will error. Not fixed yet; flagging it since it's a
+real edge case now that the query actually runs.
 
 ## Local development
 
 Backend (from repo root):
+
+Locally there's no attached app resource to inject `PGHOST`/`PGDATABASE`/
+`PGUSER`, and no app service principal — connect as yourself instead:
+`databricks auth login` against the workspace that owns the Lakebase
+instance, then export `PGHOST`, `PGDATABASE`, and `PGUSER` (your own
+Databricks username) to match your Lakebase project's connection details.
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
