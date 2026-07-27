@@ -1,0 +1,80 @@
+{
+  "updatedLabel": "updated 2m ago",
+  "kpis": [
+    {
+      "id": "leads",
+      "label": "LEADS GENERATED",
+      "value": "24,810",
+      "delta": "▲12%",
+      "deltaTone": "up-good",
+      "baselineLabel": "vs. prior period · 22,150",
+      "sparkline": [24, 22, 23, 16, 17, 9, 6],
+      "sparklineColor": "#c1502e"
+    },
+    {
+      "id": "dropoff",
+      "label": "DROP-OFF %",
+      "value": "61.4%",
+      "delta": "▲3.0pt",
+      "deltaTone": "up-bad",
+      "baselineLabel": "vs. prior period · 58.4%",
+      "sparkline": [18, 17, 19, 15, 16, 12, 10],
+      "sparklineColor": "#c0392b"
+    },
+    {
+      "id": "mau",
+      "label": "MAU",
+      "value": "182.4K",
+      "delta": "▲5%",
+      "deltaTone": "up-good",
+      "baselineLabel": "vs. prior period · 173.7K",
+      "sparkline": [22, 20, 21, 18, 15, 13, 11],
+      "sparklineColor": "#c1502e"
+    },
+    {
+      "id": "dau",
+      "label": "DAU · 23% STICK",
+      "value": "41.7K",
+      "delta": "▲0.5%",
+      "deltaTone": "flat",
+      "baselineLabel": "vs. prior period · 41.5K",
+      "sparkline": [15, 16, 14, 15, 14, 15, 14],
+      "sparklineColor": "#a08a6c"
+    }
+  ],
+  "funnel": {
+    "title": "Signup → Paid funnel",
+    "convPct": "19.4%",
+    "steps": [
+      { "step": 1, "label": "Entrypoint", "users": 24810, "convPct": 100, "dropPct": null },
+      { "step": 2, "label": "PDP Viewed", "users": 15380, "convPct": 62, "dropPct": 38 },
+      { "step": 3, "label": "PDP Clicked", "users": 9070, "convPct": 37, "dropPct": 41 },
+      { "step": 4, "label": "F1 Viewed", "users": 4810, "convPct": 19, "dropPct": 47 },
+      { "step": 4, "label": "F1 Submitted", "users": 2405, "convPct": 9.6, "dropPct": 50 }
+    ]
+  },
+  "retention": {
+    "weekLabels": ["W0", "W1", "W2", "W3", "W4"],
+    "cohorts": [
+      { "cohortLabel": "Jun1", "values": [100, 48, 31, 22, 17] },
+      { "cohortLabel": "Jun8", "values": [100, 46, 29, 20, null] },
+      { "cohortLabel": "Jun15", "values": [100, 44, 28, null, null] },
+      { "cohortLabel": "Jun22", "values": [100, 47, null, null, null] }
+    ],
+    "callout": "W2 is the retention cliff across every cohort."
+  },
+  "timeToConvert": {
+    "steps": [
+      { "label": "Visited", "dot": 1, "p50": "1.2d", "p90": "4.1d", "barPct": 35 },
+      { "label": "Signed up", "dot": 0.62, "p50": "3.8d", "p90": "11.2d", "barPct": 65, "slow": true },
+      { "label": "Activated", "dot": 0.42, "p50": "2.4d", "p90": "7.6d", "barPct": 48 },
+      { "label": "Paid", "dot": 0, "p50": "", "p90": "", "barPct": 0 }
+    ],
+    "totalLabel": "7.4 days",
+    "totalDelta": "▼0.8d vs prior"
+  },
+  "opportunity": {
+    "label": "BIGGEST OPPORTUNITY",
+    "html": "Recovering half of the <b style=\"color:#e88a5f\">Signed up → Activated</b> drop would add <b style=\"color:#e88a5f\">~3,150</b> activated users / mo."
+  }
+}

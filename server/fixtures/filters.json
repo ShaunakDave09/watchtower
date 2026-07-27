@@ -1,0 +1,7 @@
+{
+  "business": ["Payments", "Commerce", "Lending", "Subscriptions"],
+  "product": ["Checkout", "Wallet", "Storefront", "Billing"],
+  "subProduct": ["Express Pay", "One-Click", "Guest", "Saved Cards"],
+  "journey": ["Guest Checkout", "Signup", "KYC Verification", "Reactivation"],
+  "version": ["v4.1", "v4.0", "v3.8"]
+}

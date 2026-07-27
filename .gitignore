@@ -1,2 +1,13 @@
 .DS_Store
 .vite/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Databricks CLI / bundle state
+.databricks/
+
+# Frontend build output (rebuilt by the server at deploy time)
+client/dist/

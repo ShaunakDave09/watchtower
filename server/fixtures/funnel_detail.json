@@ -1,0 +1,121 @@
+{
+  "guest-checkout": {
+    "id": "guest-checkout",
+    "name": "Guest Checkout funnel",
+    "meta": "13 stages · Payments → Checkout → Express Pay · v4.1",
+    "kpis": {
+      "totalEntries": "24,810",
+      "endToEndConv": "7.2%",
+      "endToEndDelta": "▼1.3pt",
+      "avgTimeToConvert": "12.6d",
+      "avgTimeDelta": "▼0.4d",
+      "biggestDropoffLabel": "KYC Upload",
+      "biggestDropoffSub": "↓52% of users lost"
+    },
+    "stages": [
+      { "step": 1, "label": "Landing page", "users": 24810, "convPct": 100, "dropPct": null },
+      { "step": 2, "label": "CTA clicked", "users": 18360, "convPct": 74, "dropPct": 26 },
+      { "step": 3, "label": "Email entered", "users": 15380, "convPct": 62, "dropPct": 16 },
+      { "step": 4, "label": "OTP verified", "users": 13920, "convPct": 56, "dropPct": 9 },
+      { "step": 5, "label": "Profile created", "users": 11160, "convPct": 45, "dropPct": 20 },
+      { "step": 6, "label": "KYC started", "users": 9070, "convPct": 37, "dropPct": 19 },
+      { "step": 7, "label": "KYC doc upload", "users": 4350, "convPct": 18, "dropPct": 52, "worst": true },
+      { "step": 8, "label": "KYC approved", "users": 3870, "convPct": 16, "dropPct": 11 },
+      { "step": 9, "label": "Cart created", "users": 3480, "convPct": 14, "dropPct": 10 },
+      { "step": 10, "label": "Address entered", "users": 2980, "convPct": 12, "dropPct": 14 },
+      { "step": 11, "label": "Payment method", "users": 2610, "convPct": 11, "dropPct": 12 },
+      { "step": 12, "label": "Order reviewed", "users": 2120, "convPct": 9, "dropPct": 19 },
+      { "step": 13, "label": "Payment complete", "users": 1790, "convPct": 7.2, "dropPct": 16 }
+    ],
+    "dropoffReasons": {
+      "stageLabel": "STAGE 7 · KYC DOC UPLOAD",
+      "reasons": [
+        { "label": "File format unsupported", "pct": 34, "tone": "danger" },
+        { "label": "Upload timeout", "pct": 28, "tone": "danger" },
+        { "label": "Camera permission denied", "pct": 19, "tone": "accent" },
+        { "label": "Abandoned (idle >5m)", "pct": 12, "tone": "muted" },
+        { "label": "Other / unknown", "pct": 7, "tone": "faint" }
+      ]
+    },
+    "trend": [
+      { "week": "W1", "value": 6.2 },
+      { "week": "W2", "value": 6.6 },
+      { "week": "W3", "value": 6.9 },
+      { "week": "W4", "value": 6.3 },
+      { "week": "W5", "value": 7.1 },
+      { "week": "W6", "value": 7.4 },
+      { "week": "W7", "value": 7.6 },
+      { "week": "W8", "value": 8.0 }
+    ],
+    "comparison": {
+      "app": 9.1,
+      "web": 5.4,
+      "calloutHtml": "App converts 1.7× better than Web",
+      "rows": [
+        { "stage": "Landing", "app": "100%", "web": "100%" },
+        { "stage": "Email", "app": "68%", "web": "54%" },
+        { "stage": "KYC upload", "app": "22%", "web": "13%", "danger": true },
+        { "stage": "Payment", "app": "9.1%", "web": "5.4%" }
+      ]
+    },
+    "userTable": {
+      "stageLabel": "Users at stage 7 · KYC doc upload",
+      "totalUsers": 4350,
+      "users": [
+        {
+          "id": "u1",
+          "name": "Rahul Sharma",
+          "email": "rahul.s@gmail.com",
+          "currentStage": "KYC upload",
+          "stageTone": "danger",
+          "timeInStage": "2d 4h",
+          "platform": "App",
+          "status": "Stuck"
+        },
+        {
+          "id": "u2",
+          "name": "Priya Patel",
+          "email": "priya.p@outlook.com",
+          "currentStage": "KYC upload",
+          "stageTone": "danger",
+          "timeInStage": "18h",
+          "platform": "Web",
+          "status": "Retrying"
+        },
+        {
+          "id": "u3",
+          "name": "Amit Joshi",
+          "email": "amit.j@company.in",
+          "currentStage": "KYC upload",
+          "stageTone": "danger",
+          "timeInStage": "5d 12h",
+          "timeInStageDanger": true,
+          "platform": "App",
+          "status": "Stuck"
+        },
+        {
+          "id": "u4",
+          "name": "Sneha Reddy",
+          "email": "sneha.r@gmail.com",
+          "currentStage": "KYC approved",
+          "stageTone": "success",
+          "timeInStage": "—",
+          "platform": "App",
+          "status": "Passed"
+        },
+        {
+          "id": "u5",
+          "name": "Vikram Singh",
+          "email": "v.singh@yahoo.com",
+          "currentStage": "KYC upload",
+          "stageTone": "danger",
+          "timeInStage": "1d 6h",
+          "platform": "Web",
+          "status": "Retrying"
+        }
+      ],
+      "page": 1,
+      "pageCount": 870
+    }
+  }
+}
