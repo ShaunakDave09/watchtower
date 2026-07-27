@@ -8,7 +8,7 @@ import psycopg
 # used to mint Postgres OAuth credentials. Distinct from PGHOST/PGDATABASE/
 # PGUSER, which Databricks injects automatically once the instance is
 # attached to the app as a resource.
-INSTANCE_NAME = os.environ.get("LAKEBASE_INSTANCE_NAME", "datbricks_postgres")
+INSTANCE_NAME = os.environ.get("LAKEBASE_INSTANCE_NAME", "digital360")
 
 _TOKEN_TTL_SECONDS = 3600
 _TOKEN_REFRESH_MARGIN_SECONDS = 300

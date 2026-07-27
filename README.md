@@ -61,7 +61,7 @@ what `server/queries.py` expects.
 
 **Attach the database as an app resource**: on the app's page in the
 Databricks Apps UI → **Configure** → **+ Add resource** → **Database** →
-pick the `datbricks_postgres` instance. This grants the app's service
+pick the `digital360` Lakebase instance. This grants the app's service
 principal `CONNECT`/`CREATE` on the database and injects `PGHOST`,
 `PGPORT`, `PGDATABASE`, `PGUSER`, `PGSSLMODE` into the app's environment
 automatically — don't set those yourself in `app.yaml`.
@@ -69,9 +69,10 @@ automatically — don't set those yourself in `app.yaml`.
 `server/db.py` mints short-lived Postgres OAuth tokens via the Databricks
 SDK (`WorkspaceClient().database.generate_database_credential`), scoped to
 the instance named in the `LAKEBASE_INSTANCE_NAME` env var in `app.yaml`
-(currently `datbricks_postgres` — fix that in `app.yaml` if it's a typo for
-your actual instance name). Tokens are cached and refreshed automatically
-before they expire.
+(`digital360` — the Lakebase instance name shown under **Database
+instances** in the workspace, distinct from `PGDATABASE`, which is the
+default Postgres database *inside* that instance). Tokens are cached and
+refreshed automatically before they expire.
 
 `HORIZONTAL_SUMMARY_TABLE` (`server/queries.py`, default
 `digital360.horizontal_summary_daily`) is the schema-qualified Postgres name
