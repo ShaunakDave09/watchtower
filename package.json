@@ -1,0 +1,8 @@
+{
+  "name": "watchtower",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "build": "npm install --prefix client && npm run build --prefix client"
+  }
+}
