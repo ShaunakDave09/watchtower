@@ -7,4 +7,4 @@ env:
   # this app as a resource (App page -> Configure -> + Add resource ->
   # Database) — they don't go here.
   - name: "LAKEBASE_INSTANCE_NAME"
-    value: "datbricks_postgres"
+    value: "digital360"
