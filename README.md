@@ -7,6 +7,7 @@ A Databricks App with a FastAPI backend (`server/`) and a React + TypeScript
 
 ```
 app.yaml              # Databricks Apps manifest: how the app is started
+package.json          # root-level, only so Databricks builds client/ (see below)
 requirements.txt       # Python deps for the backend
 server/                # FastAPI backend
   app.py               # entrypoint: serves client/dist + /api/* routes
@@ -19,6 +20,23 @@ Databricks Apps runs your app as a single long-lived process rather than
 serving static files directly, so `server/app.py` both serves the built
 frontend (`client/dist`) and exposes the `/api/*` endpoints the frontend
 calls.
+
+### Why there's a `package.json` at the repo root
+
+Databricks Apps only auto-runs `npm install` / `npm run build` during deploy
+if it finds a `package.json` at the **root** of the app directory — it does
+not look inside subdirectories. Since the actual frontend lives in `client/`,
+the root `package.json` exists solely to satisfy that detection; its `build`
+script just delegates into `client/`:
+
+```json
+"scripts": { "build": "npm install --prefix client && npm run build --prefix client" }
+```
+
+Databricks runs this automatically before starting the process defined in
+`app.yaml`, so `client/dist` exists by the time `server/app.py` starts and
+tries to serve it. `client/dist` is gitignored — it's built at deploy time,
+not committed.
 
 ## Data
 
@@ -59,9 +77,17 @@ the API, so a single process handles everything Databricks Apps needs to run.
 
 ## Deploying to Databricks Apps
 
-1. Build the frontend: `cd client && npm run build && cd ..`
-2. Sync this directory to your Databricks workspace and deploy via the
-   `databricks apps` CLI (or the Databricks Apps UI), pointing at the repo
-   root. Databricks reads `app.yaml` to know how to start the app
-   (`python -m server.app`) and injects `DATABRICKS_APP_PORT`, which
-   `server/app.py` binds to.
+Sync this directory to your Databricks workspace and deploy via the
+`databricks apps` CLI (or the Databricks Apps UI), pointing at the repo
+root. Databricks will:
+
+1. Detect `requirements.txt` and `package.json` at the root and install both.
+2. Run `npm run build` (root `package.json`), which builds `client/` into
+   `client/dist`.
+3. Run the command from `app.yaml` (`python -m server.app`), which serves
+   `client/dist` and the `/api/*` routes, bound to the injected
+   `DATABRICKS_APP_PORT`.
+
+No manual build step is required — it happens as part of the Databricks
+deploy. (You can still build locally with `npm run build` from the repo
+root, e.g. to test the production path before deploying — see above.)
