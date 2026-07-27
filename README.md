@@ -42,26 +42,29 @@ not committed.
 
 The funnel stage/conversion breakdown — `funnel.steps` in `/api/overview` and
 `stages` in `/api/funnels/{id}` — is a real query against a Lakebase Postgres
-table (`server/queries.py`), synced from the Delta gold table
-`bfl_std_lake.digital360.horizontal_summary_daily`. Everything else on those
-endpoints (KPIs, retention, time-to-convert, drop-off reasons, trend,
-App-vs-Web comparison, the user table) still reads from static JSON fixtures
-in `server/fixtures/`, since there's no source table for them yet.
+table (`server/queries.py`): `digital360.horizontal_summary_daily`, the same
+gold-layer shape as the Delta table `bfl_std_lake.digital360.horizontal_summary_daily`,
+but populated directly in Postgres by a separate pipeline (not a Lakebase
+Delta sync). Everything else on those endpoints (KPIs, retention,
+time-to-convert, drop-off reasons, trend, App-vs-Web comparison, the user
+table) still reads from static JSON fixtures in `server/fixtures/`, since
+there's no source table for them yet.
 
 ### Lakebase setup (one-time, done in the Databricks workspace UI)
 
-1. **Sync the Delta table**: Catalog Explorer → open
-   `bfl_std_lake.digital360.horizontal_summary_daily` → **Create** →
-   **Synced table** → target the `datbricks_postgres` Lakebase instance.
-   The table has no primary key, so pick a composite key that makes rows
-   unique — likely `business, product, sub_product, journey_name,
-   ep_platform, entrypoint_stage, stage_order, date`.
-2. **Attach the database as an app resource**: on the app's page in the
-   Databricks Apps UI → **Configure** → **+ Add resource** → **Database** →
-   pick the `datbricks_postgres` instance. This grants the app's service
-   principal `CONNECT`/`CREATE` on the database and injects `PGHOST`,
-   `PGPORT`, `PGDATABASE`, `PGUSER`, `PGSSLMODE` into the app's environment
-   automatically — don't set those yourself in `app.yaml`.
+The app only needs the database attached as a resource — how
+`digital360.horizontal_summary_daily` gets populated (your own pipeline
+writing to Postgres directly) is outside the app's concern, as long as the
+table name and columns (`business, product, sub_product, journey_name,
+stage_order, stage_names, users, ep_platform, entrypoint_stage, date`) match
+what `server/queries.py` expects.
+
+**Attach the database as an app resource**: on the app's page in the
+Databricks Apps UI → **Configure** → **+ Add resource** → **Database** →
+pick the `datbricks_postgres` instance. This grants the app's service
+principal `CONNECT`/`CREATE` on the database and injects `PGHOST`,
+`PGPORT`, `PGDATABASE`, `PGUSER`, `PGSSLMODE` into the app's environment
+automatically — don't set those yourself in `app.yaml`.
 
 `server/db.py` mints short-lived Postgres OAuth tokens via the Databricks
 SDK (`WorkspaceClient().database.generate_database_credential`), scoped to
@@ -72,7 +75,7 @@ before they expire.
 
 `HORIZONTAL_SUMMARY_TABLE` (`server/queries.py`, default
 `digital360.horizontal_summary_daily`) is the schema-qualified Postgres name
-of the synced table — override via env var if you name it differently.
+of that table — override via env var if you name it differently.
 
 ### Known gap
 
