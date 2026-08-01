@@ -23,3 +23,8 @@ def get_funnel_comparison(funnel_id: str) -> dict:
 @router.get("/trends")
 def get_trends() -> dict:
     return json.loads((FIXTURES_DIR / "trends.json").read_text())
+
+
+@router.get("/alerts")
+def get_alerts() -> dict:
+    return json.loads((FIXTURES_DIR / "alerts.json").read_text())

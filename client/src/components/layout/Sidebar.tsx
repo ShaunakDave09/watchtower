@@ -144,7 +144,7 @@ export default function Sidebar() {
         <NavRow to="/trends" label="Trends" collapsed={collapsed} />
         <NavRow to="/funnels/guest-checkout/entrypoints" label="Entrypoint Performance" collapsed={collapsed} />
         <NavRow label="Cohorts" collapsed={collapsed} />
-        <NavRow label="Alerts" badge="3" collapsed={collapsed} />
+        <NavRow to="/alerts" label="Alerts" badge="3" collapsed={collapsed} />
       </div>
 
       {!collapsed && (

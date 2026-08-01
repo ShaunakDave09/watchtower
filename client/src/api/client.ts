@@ -1,4 +1,5 @@
 import type {
+  AlertsData,
   ComparisonData,
   EntrypointData,
   FilterOptions,
@@ -48,4 +49,8 @@ export function fetchFunnelComparison(funnelId: string): Promise<ComparisonData>
 
 export function fetchTrends(): Promise<TrendsData> {
   return getJson("/api/trends");
+}
+
+export function fetchAlerts(): Promise<AlertsData> {
+  return getJson("/api/alerts");
 }
