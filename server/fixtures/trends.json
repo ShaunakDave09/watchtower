@@ -329,7 +329,7 @@
       {
         "key": "visitedPaid",
         "label": "Visited\u2192Paid",
-        "color": "var(--color-ink)",
+        "color": "#8a7c65",
         "values": [
           15.1,
           15.2,
