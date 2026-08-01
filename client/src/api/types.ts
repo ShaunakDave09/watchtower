@@ -109,6 +109,94 @@ export interface UserRow {
   status: "Stuck" | "Retrying" | "Passed";
 }
 
+export interface EntrypointSource {
+  id: string;
+  name: string;
+  entered: number;
+  quality: number;
+  tier: "high" | "mid" | "low";
+}
+
+export interface EntrypointBySource {
+  id: string;
+  name: string;
+  quality: number;
+  stages: { label: string; users: number }[];
+}
+
+export interface EntrypointData {
+  funnelId: string;
+  funnelName: string;
+  meta: string;
+  funnelEntry: number;
+  funnelEntryLabel: string;
+  best: { source: string; quality: number; note: string };
+  worst: { source: string; quality: number; note: string };
+  sources: EntrypointSource[];
+  bySource: EntrypointBySource[];
+}
+
+export interface ComparisonKpi {
+  label: string;
+  value: string;
+  delta: string;
+  deltaTone: Kpi["deltaTone"];
+  sub: string;
+}
+
+export interface ComparisonFunnel {
+  dateLabel: string;
+  convPct: string;
+  steps: FunnelStep[];
+}
+
+export interface ComparisonData {
+  funnelId: string;
+  dateA: { label: string; short: string };
+  dateB: { label: string; short: string };
+  quickCompare: string[];
+  activeQuickCompare: string;
+  kpis: ComparisonKpi[];
+  funnelA: ComparisonFunnel;
+  funnelB: ComparisonFunnel;
+  calloutHtml: string;
+}
+
+export interface TrendSeries {
+  key: string;
+  label: string;
+  color: string;
+  values: number[];
+  endLabel: string | null;
+}
+
+export interface TrendsData {
+  period: string;
+  subtitle: string;
+  hourly: {
+    liveLabel: string;
+    tickLabels: string[];
+    entrants: number[];
+    convRate: number[];
+    expectedLow: number[];
+    expectedHigh: number[];
+    alertHtml: string;
+  };
+  pacing: {
+    currentHour: number;
+    today: number[];
+    yesterday: number[];
+    projection: number[];
+    nowValue: number;
+    nowDelta: string;
+    projectionText: string;
+  };
+  conversionTrend: {
+    dates: string[];
+    series: TrendSeries[];
+  };
+}
+
 export interface FunnelDetailData {
   id: string;
   name: string;

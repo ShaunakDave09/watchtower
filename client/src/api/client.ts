@@ -1,4 +1,12 @@
-import type { FilterOptions, FilterState, FunnelDetailData, OverviewData } from "./types";
+import type {
+  ComparisonData,
+  EntrypointData,
+  FilterOptions,
+  FilterState,
+  FunnelDetailData,
+  OverviewData,
+  TrendsData,
+} from "./types";
 
 async function getJson<T>(path: string): Promise<T> {
   const res = await fetch(path);
@@ -28,4 +36,16 @@ export function fetchOverview(filters: FilterState): Promise<OverviewData> {
 
 export function fetchFunnelDetail(funnelId: string): Promise<FunnelDetailData> {
   return getJson(`/api/funnels/${funnelId}`);
+}
+
+export function fetchFunnelEntrypoints(funnelId: string): Promise<EntrypointData> {
+  return getJson(`/api/funnels/${funnelId}/entrypoints`);
+}
+
+export function fetchFunnelComparison(funnelId: string): Promise<ComparisonData> {
+  return getJson(`/api/funnels/${funnelId}/compare`);
+}
+
+export function fetchTrends(): Promise<TrendsData> {
+  return getJson("/api/trends");
 }

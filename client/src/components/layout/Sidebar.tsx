@@ -41,7 +41,7 @@ function rowContent(label: string, active: boolean, collapsed: boolean, badge?: 
 }
 
 function NavRow({ to, label, badge, collapsed = false }: NavItemProps) {
-  const base = `flex items-center gap-[11px] rounded-[9px] px-[11px] py-[9px] text-[13.5px] ${collapsed ? "justify-center px-0" : ""}`;
+  const base = `flex items-center gap-[10px] rounded-[9px] px-[11px] py-[9px] text-[13px] ${collapsed ? "justify-center px-0" : ""}`;
 
   if (!to) {
     return (
@@ -53,7 +53,7 @@ function NavRow({ to, label, badge, collapsed = false }: NavItemProps) {
   return (
     <NavLink
       to={to}
-      end={to === "/"}
+      end
       title={collapsed ? label : undefined}
       className={({ isActive }) => `${base} ${activeClasses(isActive)}`}
     >
@@ -70,7 +70,7 @@ function ThemeToggle({ collapsed }: { collapsed: boolean }) {
     <button
       onClick={toggle}
       title={collapsed ? (isDark ? "Switch to light mode" : "Switch to dark mode") : undefined}
-      className={`flex items-center gap-[11px] rounded-[9px] px-[11px] py-[9px] text-[13.5px] text-[var(--color-body)] hover:bg-[var(--color-border)]/40 ${collapsed ? "justify-center px-0" : ""}`}
+      className={`flex items-center gap-[10px] rounded-[9px] px-[11px] py-[9px] text-[13px] text-[var(--color-body)] hover:bg-[var(--color-border)]/40 ${collapsed ? "justify-center px-0" : ""}`}
     >
       <svg width="18" height="18" viewBox="0 0 16 16" fill="none" className="flex-none">
         {isDark ? (
@@ -103,7 +103,7 @@ export default function Sidebar() {
 
   return (
     <div
-      className={`relative flex ${collapsed ? "w-[72px]" : "w-[214px]"} flex-none flex-col border-r border-[var(--color-border)] bg-[var(--color-card)] px-[14px] py-[18px] transition-[width] duration-200`}
+      className={`relative flex ${collapsed ? "w-[72px]" : "w-[270px]"} flex-none flex-col border-r border-[var(--color-border)] bg-[var(--color-card)] px-[14px] py-[18px] transition-[width] duration-200`}
     >
       <button
         onClick={() => setCollapsed((c) => !c)}
@@ -141,6 +141,8 @@ export default function Sidebar() {
       <div className="flex flex-col gap-[3px]">
         <NavRow to="/" label="Overview" collapsed={collapsed} />
         <NavRow to="/funnels/guest-checkout" label="Funnels" collapsed={collapsed} />
+        <NavRow to="/trends" label="Trends" collapsed={collapsed} />
+        <NavRow to="/funnels/guest-checkout/entrypoints" label="Entrypoint Performance" collapsed={collapsed} />
         <NavRow label="Cohorts" collapsed={collapsed} />
         <NavRow label="Alerts" badge="3" collapsed={collapsed} />
       </div>
