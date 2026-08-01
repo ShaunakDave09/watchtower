@@ -70,8 +70,8 @@ export default function Trends() {
             <div className="flex-1" />
             <div className="flex items-center gap-[12px]">
               <LegendDot color="var(--color-accent-light)" label="Entrants" />
-              <LegendDot color="var(--color-ink)" label="Conv. rate" />
-              <LegendDot color="var(--color-quiet)" label="Expected band" />
+              <LegendDot color="var(--color-ink)" label="Curr. conv." />
+              <LegendDot color="var(--color-quiet)" label="Last 7d avg" />
             </div>
           </div>
           <div className="mb-3 font-mono text-[10px] text-[var(--color-faint)]">
