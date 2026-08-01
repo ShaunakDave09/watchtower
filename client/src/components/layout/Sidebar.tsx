@@ -2,22 +2,16 @@ import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import type { ReactNode } from "react";
 import { useTheme } from "../../hooks/useTheme";
+import NavIcon from "./NavIcons";
+import type { NavIconName } from "./NavIcons";
 
 interface NavItemProps {
   to?: string;
+  icon: NavIconName;
   label: string;
   badge?: string;
   active?: boolean;
   collapsed?: boolean;
-}
-
-function NavIcon({ active }: { active: boolean }) {
-  return (
-    <div
-      className="h-[18px] w-[18px] flex-none rounded-[5px]"
-      style={{ background: active ? "var(--color-accent)" : "var(--color-border-strong)" }}
-    />
-  );
 }
 
 function activeClasses(active: boolean) {
@@ -26,10 +20,10 @@ function activeClasses(active: boolean) {
     : "text-[var(--color-body)] hover:bg-[var(--color-border)]/40";
 }
 
-function rowContent(label: string, active: boolean, collapsed: boolean, badge?: string): ReactNode {
+function rowContent(icon: NavIconName, label: string, active: boolean, collapsed: boolean, badge?: string): ReactNode {
   return (
     <>
-      <NavIcon active={active} />
+      <NavIcon name={icon} active={active} />
       {!collapsed && <span className="truncate">{label}</span>}
       {!collapsed && badge && (
         <span className="ml-auto rounded-full bg-[var(--color-danger)] px-[7px] py-[1px] font-mono text-[10px] text-white">
@@ -40,13 +34,13 @@ function rowContent(label: string, active: boolean, collapsed: boolean, badge?: 
   );
 }
 
-function NavRow({ to, label, badge, collapsed = false }: NavItemProps) {
+function NavRow({ to, icon, label, badge, collapsed = false }: NavItemProps) {
   const base = `flex items-center gap-[10px] rounded-[9px] px-[11px] py-[9px] text-[13px] ${collapsed ? "justify-center px-0" : ""}`;
 
   if (!to) {
     return (
       <div title={collapsed ? label : undefined} className={`${base} ${activeClasses(false)} cursor-default`}>
-        {rowContent(label, false, collapsed, badge)}
+        {rowContent(icon, label, false, collapsed, badge)}
       </div>
     );
   }
@@ -57,7 +51,7 @@ function NavRow({ to, label, badge, collapsed = false }: NavItemProps) {
       title={collapsed ? label : undefined}
       className={({ isActive }) => `${base} ${activeClasses(isActive)}`}
     >
-      {({ isActive }) => rowContent(label, isActive, collapsed, badge)}
+      {({ isActive }) => rowContent(icon, label, isActive, collapsed, badge)}
     </NavLink>
   );
 }
@@ -139,12 +133,12 @@ export default function Sidebar() {
         </div>
       )}
       <div className="flex flex-col gap-[3px]">
-        <NavRow to="/" label="Overview" collapsed={collapsed} />
-        <NavRow to="/funnels/guest-checkout" label="Funnels" collapsed={collapsed} />
-        <NavRow to="/trends" label="Trends" collapsed={collapsed} />
-        <NavRow to="/funnels/guest-checkout/entrypoints" label="Entrypoint Performance" collapsed={collapsed} />
-        <NavRow label="Cohorts" collapsed={collapsed} />
-        <NavRow to="/alerts" label="Alerts" badge="3" collapsed={collapsed} />
+        <NavRow to="/" icon="overview" label="Overview" collapsed={collapsed} />
+        <NavRow to="/funnels/guest-checkout" icon="funnels" label="Funnels" collapsed={collapsed} />
+        <NavRow to="/trends" icon="trends" label="Trends" collapsed={collapsed} />
+        <NavRow to="/funnels/guest-checkout/entrypoints" icon="entrypoints" label="Entrypoint Performance" collapsed={collapsed} />
+        <NavRow icon="cohorts" label="Cohorts" collapsed={collapsed} />
+        <NavRow to="/alerts" icon="alerts" label="Alerts" badge="3" collapsed={collapsed} />
       </div>
 
       {!collapsed && (
@@ -153,8 +147,8 @@ export default function Sidebar() {
         </div>
       )}
       <div className={`flex flex-col gap-[3px] ${collapsed ? "pt-5" : ""}`}>
-        <NavRow label="Integrations" collapsed={collapsed} />
-        <NavRow label="Settings" collapsed={collapsed} />
+        <NavRow icon="integrations" label="Integrations" collapsed={collapsed} />
+        <NavRow icon="settings" label="Settings" collapsed={collapsed} />
         <ThemeToggle collapsed={collapsed} />
       </div>
 
