@@ -3,16 +3,25 @@ import { useNavigate, useParams } from "react-router-dom";
 import { fetchEntrypointSourceDetail } from "../api/client";
 import type { FunnelDetailData } from "../api/types";
 import FunnelDetailView from "../components/funnelDetail/FunnelDetailView";
+import LoadError from "../components/ui/LoadError";
 
 export default function EntrypointSourceDetail() {
   const { funnelId = "guest-checkout", sourceId = "" } = useParams();
   const navigate = useNavigate();
   const [data, setData] = useState<FunnelDetailData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    fetchEntrypointSourceDetail(funnelId, sourceId).then(setData);
-  }, [funnelId, sourceId]);
+    setError(null);
+    fetchEntrypointSourceDetail(funnelId, sourceId)
+      .then(setData)
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+  }, [funnelId, sourceId, reloadKey]);
 
+  if (error) {
+    return <LoadError message={error} onRetry={() => setReloadKey((k) => k + 1)} />;
+  }
   if (!data) {
     return <div className="p-8 font-mono text-sm text-[var(--color-muted)]">Loading…</div>;
   }

@@ -12,17 +12,26 @@ import FilterBar from "../components/overview/FilterBar";
 import FilterModal from "../components/overview/FilterModal";
 import FiltersButton from "../components/filters/FiltersButton";
 import Panel from "../components/ui/Panel";
+import LoadError from "../components/ui/LoadError";
 
 export default function Overview() {
   const navigate = useNavigate();
   const filters = useFiltersContext();
   const [data, setData] = useState<OverviewData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    fetchOverview(filters.filters).then(setData);
+    setError(null);
+    fetchOverview(filters.filters)
+      .then(setData)
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.filters]);
+  }, [filters.filters, reloadKey]);
 
+  if (error) {
+    return <LoadError message={error} onRetry={() => setReloadKey((k) => k + 1)} />;
+  }
   if (!data) {
     return <div className="p-8 font-mono text-sm text-[var(--color-muted)]">Loading…</div>;
   }

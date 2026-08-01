@@ -8,6 +8,7 @@ import ConversionTrendMultiLine from "../components/trends/ConversionTrendMultiL
 import FiltersButton from "../components/filters/FiltersButton";
 import FilterBar from "../components/overview/FilterBar";
 import FilterModal from "../components/overview/FilterModal";
+import LoadError from "../components/ui/LoadError";
 
 function LegendDot({ color, label, dashed = false }: { color: string; label: string; dashed?: boolean }) {
   return (
@@ -24,11 +25,19 @@ function LegendDot({ color, label, dashed = false }: { color: string; label: str
 export default function Trends() {
   const [data, setData] = useState<TrendsData | null>(null);
   const [range, setRange] = useState<"7d" | "30d" | "90d">("30d");
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    fetchTrends().then(setData);
-  }, []);
+    setError(null);
+    fetchTrends()
+      .then(setData)
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+  }, [reloadKey]);
 
+  if (error) {
+    return <LoadError message={error} onRetry={() => setReloadKey((k) => k + 1)} />;
+  }
   if (!data) {
     return <div className="p-8 font-mono text-sm text-[var(--color-muted)]">Loading…</div>;
   }

@@ -7,6 +7,7 @@ import FunnelChart from "../components/overview/FunnelChart";
 import FiltersButton from "../components/filters/FiltersButton";
 import FilterBar from "../components/overview/FilterBar";
 import FilterModal from "../components/overview/FilterModal";
+import LoadError from "../components/ui/LoadError";
 
 function ComparisonKpiCard({
   label,
@@ -44,14 +45,22 @@ export default function FunnelComparison() {
   const navigate = useNavigate();
   const [data, setData] = useState<ComparisonData | null>(null);
   const [activeQuickCompare, setActiveQuickCompare] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    fetchFunnelComparison(funnelId).then((d) => {
-      setData(d);
-      setActiveQuickCompare(d.activeQuickCompare);
-    });
-  }, [funnelId]);
+    setError(null);
+    fetchFunnelComparison(funnelId)
+      .then((d) => {
+        setData(d);
+        setActiveQuickCompare(d.activeQuickCompare);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+  }, [funnelId, reloadKey]);
 
+  if (error) {
+    return <LoadError message={error} onRetry={() => setReloadKey((k) => k + 1)} />;
+  }
   if (!data) {
     return <div className="p-8 font-mono text-sm text-[var(--color-muted)]">Loading…</div>;
   }

@@ -8,6 +8,7 @@ import SourceFunnelCard from "../components/entrypoints/SourceFunnelCard";
 import FiltersButton from "../components/filters/FiltersButton";
 import FilterBar from "../components/overview/FilterBar";
 import FilterModal from "../components/overview/FilterModal";
+import LoadError from "../components/ui/LoadError";
 
 function ExtremeCard({
   label,
@@ -40,11 +41,19 @@ export default function EntrypointPerformance() {
   const navigate = useNavigate();
   const [data, setData] = useState<EntrypointData | null>(null);
   const [range, setRange] = useState<"30d" | "7d">("30d");
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    fetchFunnelEntrypoints(funnelId).then(setData);
-  }, [funnelId]);
+    setError(null);
+    fetchFunnelEntrypoints(funnelId)
+      .then(setData)
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+  }, [funnelId, reloadKey]);
 
+  if (error) {
+    return <LoadError message={error} onRetry={() => setReloadKey((k) => k + 1)} />;
+  }
   if (!data) {
     return <div className="p-8 font-mono text-sm text-[var(--color-muted)]">Loading…</div>;
   }
