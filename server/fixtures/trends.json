@@ -116,7 +116,7 @@
       21.4,
       21.4
     ],
-    "alertHtml": "Conversion rate has been below the expected band for the last <strong>3 hours</strong> \u2014 down to <strong>12.8%</strong> vs. an expected ~19%."
+    "alertHtml": "Conversion rate has been below the last 7d avg for the last <strong>3 hours</strong> \u2014 down to <strong>12.8%</strong> vs. a ~19% average."
   },
   "pacing": {
     "currentHour": 14,

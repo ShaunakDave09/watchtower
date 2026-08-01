@@ -100,9 +100,12 @@ export default function HourlyThroughputChart({ hourly }: { hourly: TrendsData["
         <ChartTooltip xPct={(cx(hover) / W) * 100} yPct={(barY(entrants[hover]) / TOTAL_H) * 100}>
           <div className="font-semibold">{hourLabel(hover, n)}</div>
           <div className="text-[#c9a68a]">
-            {entrants[hover].toLocaleString()} entrants · {convRate[hover]}% conv
+            {entrants[hover].toLocaleString()} entrants · {convRate[hover]}% curr. conv.
           </div>
-          {convRate[hover] < expectedLow[hover] && <div className="text-[#ff8a80]">Below expected band</div>}
+          <div className="text-[#a99a86]">
+            {expectedLow[hover]}–{expectedHigh[hover]}% last 7d avg
+          </div>
+          {convRate[hover] < expectedLow[hover] && <div className="text-[#ff8a80]">Below last 7d avg</div>}
         </ChartTooltip>
       )}
     </div>
