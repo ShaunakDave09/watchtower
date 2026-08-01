@@ -92,7 +92,25 @@ export default function FunnelDetail() {
               </button>
             ))}
           </div>
-          <button className="inline-flex items-center gap-[7px] rounded-[9px] border border-[var(--color-border-strong)] bg-[var(--color-card)] px-[14px] py-[7px] text-[12px] font-medium text-[var(--color-ink)] hover:bg-[var(--color-accent-soft)]">
+          <button
+            onClick={() => navigate(`/funnels/${data.id}/entrypoints`)}
+            className="inline-flex items-center gap-[7px] rounded-[9px] border border-[var(--color-border-strong)] bg-[var(--color-card)] px-[14px] py-[7px] text-[12px] font-medium text-[var(--color-ink)] hover:bg-[var(--color-accent-soft)]"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M2 4h4l2 8h4M12 4l2 4-2 4"
+                stroke="var(--color-accent)"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Entry points
+          </button>
+          <button
+            onClick={() => navigate(`/funnels/${data.id}/compare`)}
+            className="inline-flex items-center gap-[7px] rounded-[9px] border border-[var(--color-border-strong)] bg-[var(--color-card)] px-[14px] py-[7px] text-[12px] font-medium text-[var(--color-ink)] hover:bg-[var(--color-accent-soft)]"
+          >
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
               <path d="M8 2v12M2 8h12" stroke="var(--color-accent)" strokeWidth="1.5" strokeLinecap="round" />
             </svg>

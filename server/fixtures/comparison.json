@@ -1,0 +1,36 @@
+{
+  "guest-checkout": {
+    "funnelId": "guest-checkout",
+    "dateA": { "label": "Today · Jul 27, 2026", "short": "Today · Jul 27" },
+    "dateB": { "label": "Jun 27, 2026", "short": "Jun 27" },
+    "quickCompare": ["Yesterday", "Same day last week", "Same day last month", "Same day last quarter", "Custom date…"],
+    "activeQuickCompare": "Same day last month",
+    "kpis": [
+      { "label": "VISITED", "value": "24,810", "delta": "▲12%", "deltaTone": "up-good", "sub": "vs. 22,150 on Jun 27" },
+      { "label": "CONVERSION RATE", "value": "19.4%", "delta": "▲4.2pt", "deltaTone": "up-good", "sub": "vs. 15.2% on Jun 27" },
+      { "label": "TOTAL DROP-OFF", "value": "80.6%", "delta": "▼4.2pt", "deltaTone": "up-good", "sub": "vs. 84.8% on Jun 27" },
+      { "label": "TIME TO CONVERT", "value": "7.4d", "delta": "▼0.9d", "deltaTone": "up-good", "sub": "vs. 8.3d on Jun 27" }
+    ],
+    "funnelA": {
+      "dateLabel": "Today · Jul 27",
+      "convPct": "19.4%",
+      "steps": [
+        { "step": 1, "label": "Visited", "users": 24810, "convPct": 100, "dropPct": null },
+        { "step": 2, "label": "Signed up", "users": 15380, "convPct": 62, "dropPct": null },
+        { "step": 3, "label": "Activated", "users": 9070, "convPct": 37, "dropPct": null },
+        { "step": 4, "label": "Paid", "users": 4810, "convPct": 19, "dropPct": null }
+      ]
+    },
+    "funnelB": {
+      "dateLabel": "Jun 27",
+      "convPct": "15.2%",
+      "steps": [
+        { "step": 1, "label": "Visited", "users": 22150, "convPct": 100, "dropPct": null },
+        { "step": 2, "label": "Signed up", "users": 12847, "convPct": 58, "dropPct": null },
+        { "step": 3, "label": "Activated", "users": 7310, "convPct": 33, "dropPct": null },
+        { "step": 4, "label": "Paid", "users": 3500, "convPct": 15, "dropPct": null }
+      ]
+    },
+    "calloutHtml": "<b style=\"color:#e88a5f\">Signed up → Activated</b> is the biggest gainer vs. last month, up <b style=\"color:#e88a5f\">4pt</b> — likely the KYC flow fix shipped Jun 30."
+  }
+}

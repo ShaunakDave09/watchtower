@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from server.routers import funnels, overview
+from server.routers import funnels, insights, overview
 
 CLIENT_DIST = Path(__file__).resolve().parent.parent / "client" / "dist"
 
@@ -14,6 +14,7 @@ app = FastAPI(title="Watchtower")
 
 app.include_router(overview.router)
 app.include_router(funnels.router)
+app.include_router(insights.router)
 
 if CLIENT_DIST.exists():
     app.mount("/assets", StaticFiles(directory=CLIENT_DIST / "assets"), name="assets")

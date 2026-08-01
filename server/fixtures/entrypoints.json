@@ -1,0 +1,75 @@
+{
+  "guest-checkout": {
+    "funnelId": "guest-checkout",
+    "funnelName": "Guest Checkout",
+    "meta": "6 sources feeding Stage 1 · quality = converted ÷ entered",
+    "funnelEntry": 24810,
+    "funnelEntryLabel": "Stage 1 · Landing page",
+    "best": { "source": "Referral", "quality": 15.0, "note": "lowest volume" },
+    "worst": { "source": "Paid Social", "quality": 3.0, "note": "2nd-highest volume" },
+    "sources": [
+      { "id": "organic-search", "name": "Organic Search", "entered": 9200, "quality": 8.0, "tier": "mid" },
+      { "id": "paid-social", "name": "Paid Social", "entered": 6400, "quality": 3.0, "tier": "low" },
+      { "id": "email-campaign", "name": "Email Campaign", "entered": 3100, "quality": 12.0, "tier": "high" },
+      { "id": "referral", "name": "Referral", "entered": 2850, "quality": 15.0, "tier": "high" },
+      { "id": "direct-app-link", "name": "Direct / App link", "entered": 2100, "quality": 6.0, "tier": "mid" },
+      { "id": "partner-api", "name": "Partner API", "entered": 1160, "quality": 3.0, "tier": "low" }
+    ],
+    "bySource": [
+      {
+        "id": "referral", "name": "Referral", "quality": 15.0,
+        "stages": [
+          { "label": "Visited", "users": 2850 },
+          { "label": "Signed up", "users": 1995 },
+          { "label": "Activated", "users": 1111 },
+          { "label": "Paid", "users": 428 }
+        ]
+      },
+      {
+        "id": "email-campaign", "name": "Email Campaign", "quality": 12.0,
+        "stages": [
+          { "label": "Visited", "users": 3100 },
+          { "label": "Signed up", "users": 1984 },
+          { "label": "Activated", "users": 930 },
+          { "label": "Paid", "users": 372 }
+        ]
+      },
+      {
+        "id": "organic-search", "name": "Organic Search", "quality": 8.0,
+        "stages": [
+          { "label": "Visited", "users": 9200 },
+          { "label": "Signed up", "users": 4876 },
+          { "label": "Activated", "users": 1932 },
+          { "label": "Paid", "users": 736 }
+        ]
+      },
+      {
+        "id": "direct-app-link", "name": "Direct / App link", "quality": 6.0,
+        "stages": [
+          { "label": "Visited", "users": 2100 },
+          { "label": "Signed up", "users": 987 },
+          { "label": "Activated", "users": 336 },
+          { "label": "Paid", "users": 126 }
+        ]
+      },
+      {
+        "id": "paid-social", "name": "Paid Social", "quality": 3.0,
+        "stages": [
+          { "label": "Visited", "users": 6400 },
+          { "label": "Signed up", "users": 2240 },
+          { "label": "Activated", "users": 512 },
+          { "label": "Paid", "users": 192 }
+        ]
+      },
+      {
+        "id": "partner-api", "name": "Partner API", "quality": 3.0,
+        "stages": [
+          { "label": "Visited", "users": 1160 },
+          { "label": "Signed up", "users": 394 },
+          { "label": "Activated", "users": 93 },
+          { "label": "Paid", "users": 58 }
+        ]
+      }
+    ]
+  }
+}

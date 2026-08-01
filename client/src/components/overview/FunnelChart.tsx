@@ -1,3 +1,4 @@
+import { useId } from "react";
 import type { FunnelStep } from "../../api/types";
 
 const TRACK_X = 120;
@@ -13,7 +14,18 @@ interface Row {
   barW: number;
 }
 
-export default function FunnelChart({ steps }: { steps: FunnelStep[] }) {
+export default function FunnelChart({
+  steps,
+  tone = "accent",
+  showDrop = true,
+}: {
+  steps: FunnelStep[];
+  tone?: "accent" | "muted";
+  showDrop?: boolean;
+}) {
+  const uid = useId();
+  const gradFill = `fc-fill-${uid}`;
+  const gradFinal = `fc-final-${uid}`;
   const height = TOP_PAD * 2 + steps.length * ROW_H + (steps.length - 1) * ROW_GAP;
 
   const rows: Row[] = steps.map((step, i) => {
@@ -23,17 +35,21 @@ export default function FunnelChart({ steps }: { steps: FunnelStep[] }) {
     return { step, y, barX, barW };
   });
 
+  const mainTextFill = tone === "accent" ? "#fff" : "var(--color-ink)";
+  const subTextFill = tone === "accent" ? "#ffe0cf" : "var(--color-ink-soft)";
+  const ghostFill = tone === "accent" ? "var(--color-accent)" : "var(--color-ink)";
+  const ghostOpacity = tone === "accent" ? 0.13 : 0.05;
+
   return (
     <svg viewBox={`0 0 620 ${height}`} width="100%" style={{ display: "block" }}>
       <defs>
-        <linearGradient id="fc-accent" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="var(--color-accent-light)" />
-          <stop offset="1" stopColor="var(--color-accent)" />
+        <linearGradient id={gradFill} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={tone === "accent" ? "var(--color-accent-light)" : "var(--color-quiet)"} />
+          <stop offset="1" stopColor={tone === "accent" ? "var(--color-accent)" : "var(--color-border-strong)"} />
         </linearGradient>
-        <linearGradient id="fc-final" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={gradFinal} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="var(--color-dark-soft)" />
-          <stop offset="1" stopColor="var(--color-dark)" /> 
-
+          <stop offset="1" stopColor="var(--color-dark)" />
         </linearGradient>
       </defs>
 
@@ -43,7 +59,7 @@ export default function FunnelChart({ steps }: { steps: FunnelStep[] }) {
         ))}
       </g>
 
-      <g fill="var(--color-accent)" fillOpacity={0.13}>
+      <g fill={ghostFill} fillOpacity={ghostOpacity}>
         {rows.slice(0, -1).map((r, i) => {
           const next = rows[i + 1];
           const bottomY = r.y + ROW_H;
@@ -64,18 +80,24 @@ export default function FunnelChart({ steps }: { steps: FunnelStep[] }) {
           width={r.barW}
           height={ROW_H}
           rx={7}
-          fill={i === rows.length - 1 ? "url(#fc-final)" : "url(#fc-accent)"}
+          fill={i === rows.length - 1 ? `url(#${gradFinal})` : `url(#${gradFill})`}
         />
       ))}
 
-      <g fontFamily="'IBM Plex Sans',system-ui,sans-serif" fontWeight={700} fill="#fff" textAnchor="middle">
-        {rows.map((r) => (
-          <text key={r.step.step} x={340} y={r.y + 23} fontSize={r === rows[rows.length - 1] ? 14 : 16}>
+      <g fontFamily="'IBM Plex Sans',system-ui,sans-serif" fontWeight={700} textAnchor="middle">
+        {rows.map((r, i) => (
+          <text
+            key={r.step.step}
+            x={340}
+            y={r.y + 23}
+            fontSize={r === rows[rows.length - 1] ? 14 : 16}
+            fill={i === rows.length - 1 ? "#fff" : mainTextFill}
+          >
             {r.step.convPct}%
           </text>
         ))}
       </g>
-      <g fontFamily="'IBM Plex Mono',ui-monospace,monospace" fontSize={9.5} fill="#ffe0cf" textAnchor="middle">
+      <g fontFamily="'IBM Plex Mono',ui-monospace,monospace" fontSize={9.5} fill={subTextFill} textAnchor="middle">
         {rows.slice(0, -1).map((r) => (
           <text key={r.step.step} x={340} y={r.y + 38}>
             {r.step.users.toLocaleString()}
@@ -101,13 +123,15 @@ export default function FunnelChart({ steps }: { steps: FunnelStep[] }) {
         ))}
       </g>
 
-      <g fontFamily="'IBM Plex Mono',ui-monospace,monospace" fontSize={11.5} fontWeight={600} fill="var(--color-danger)" textAnchor="start">
-        {rows.slice(1).map((r) => (
-          <text key={r.step.step} x={574} y={r.y - ROW_GAP / 2 + 4}>
-            ↓{r.step.dropPct}%
-          </text>
-        ))}
-      </g>
+      {showDrop && (
+        <g fontFamily="'IBM Plex Mono',ui-monospace,monospace" fontSize={11.5} fontWeight={600} fill="var(--color-danger)" textAnchor="start">
+          {rows.slice(1).map((r) => (
+            <text key={r.step.step} x={574} y={r.y - ROW_GAP / 2 + 4}>
+              ↓{r.step.dropPct}%
+            </text>
+          ))}
+        </g>
+      )}
     </svg>
   );
 }
