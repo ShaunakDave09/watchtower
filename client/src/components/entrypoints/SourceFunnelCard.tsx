@@ -1,14 +1,19 @@
+import { useNavigate } from "react-router-dom";
 import type { EntrypointBySource } from "../../api/types";
 
 const tierColorByQuality = (quality: number) =>
   quality >= 10 ? "var(--color-success)" : quality >= 5 ? "var(--color-warning)" : "var(--color-danger)";
 
-export default function SourceFunnelCard({ source }: { source: EntrypointBySource }) {
+export default function SourceFunnelCard({ funnelId, source }: { funnelId: string; source: EntrypointBySource }) {
+  const navigate = useNavigate();
   const color = tierColorByQuality(source.quality);
   const base = source.stages[0]?.users || 1;
 
   return (
-    <div className="rounded-[10px] border border-[var(--color-border)] bg-[var(--color-card)] p-[14px]">
+    <button
+      onClick={() => navigate(`/funnels/${funnelId}/entrypoints/${source.id}`)}
+      className="rounded-[10px] border border-[var(--color-border)] bg-[var(--color-card)] p-[14px] text-left transition-shadow hover:shadow-[0_4px_16px_-8px_rgba(58,47,38,0.25)]"
+    >
       <div className="text-[13px] font-semibold text-[var(--color-ink)]">{source.name}</div>
       <div className="mb-[10px] font-mono text-[10.5px] font-semibold" style={{ color }}>
         {source.quality.toFixed(1)}% quality
@@ -31,6 +36,7 @@ export default function SourceFunnelCard({ source }: { source: EntrypointBySourc
           </div>
         ))}
       </div>
-    </div>
+      <div className="mt-[10px] font-mono text-[9.5px] text-[var(--color-faint)]">View funnel →</div>
+    </button>
   );
 }

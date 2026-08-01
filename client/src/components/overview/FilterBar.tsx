@@ -1,6 +1,7 @@
-import type { UseFiltersReturn } from "../../hooks/useFilters";
+import { useFiltersContext } from "../../context/FiltersContext";
 
-export default function FilterBar({ filters }: { filters: UseFiltersReturn }) {
+export default function FilterBar() {
+  const filters = useFiltersContext();
   return (
     <div className="mt-2 flex flex-wrap items-center gap-[7px]">
       <span className="font-mono text-[9.5px] tracking-[0.08em] text-[var(--color-faint)]">ACTIVE</span>

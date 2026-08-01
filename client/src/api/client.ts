@@ -1,4 +1,5 @@
 import type {
+  AlertsData,
   ComparisonData,
   EntrypointData,
   FilterOptions,
@@ -42,10 +43,18 @@ export function fetchFunnelEntrypoints(funnelId: string): Promise<EntrypointData
   return getJson(`/api/funnels/${funnelId}/entrypoints`);
 }
 
+export function fetchEntrypointSourceDetail(funnelId: string, sourceId: string): Promise<FunnelDetailData> {
+  return getJson(`/api/funnels/${funnelId}/entrypoints/${sourceId}`);
+}
+
 export function fetchFunnelComparison(funnelId: string): Promise<ComparisonData> {
   return getJson(`/api/funnels/${funnelId}/compare`);
 }
 
 export function fetchTrends(): Promise<TrendsData> {
   return getJson("/api/trends");
+}
+
+export function fetchAlerts(): Promise<AlertsData> {
+  return getJson("/api/alerts");
 }

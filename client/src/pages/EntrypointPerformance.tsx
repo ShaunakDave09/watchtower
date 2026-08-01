@@ -5,6 +5,9 @@ import type { EntrypointData } from "../api/types";
 import Panel from "../components/ui/Panel";
 import ConvergenceDiagram from "../components/entrypoints/ConvergenceDiagram";
 import SourceFunnelCard from "../components/entrypoints/SourceFunnelCard";
+import FiltersButton from "../components/filters/FiltersButton";
+import FilterBar from "../components/overview/FilterBar";
+import FilterModal from "../components/overview/FilterModal";
 
 function ExtremeCard({
   label,
@@ -73,27 +76,33 @@ export default function EntrypointPerformance() {
           </div>
         </div>
         <div className="flex-1" />
-        <div className="flex gap-[3px] rounded-[9px] border border-[var(--color-border-strong)] bg-[var(--color-accent-chip)] p-[3px]">
-          {(
-            [
-              { key: "30d", label: "Last 30 days" },
-              { key: "7d", label: "Last 7 days" },
-            ] as const
-          ).map((opt) => (
-            <button
-              key={opt.key}
-              onClick={() => setRange(opt.key)}
-              className={`rounded-[7px] px-[14px] py-[7px] text-[12px] font-semibold transition-colors ${
-                range === opt.key ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-body)] hover:bg-[var(--color-border)]/50"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          <FiltersButton />
+          <div className="flex gap-[3px] rounded-[9px] border border-[var(--color-border-strong)] bg-[var(--color-accent-chip)] p-[3px]">
+            {(
+              [
+                { key: "30d", label: "Last 30 days" },
+                { key: "7d", label: "Last 7 days" },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.key}
+                onClick={() => setRange(opt.key)}
+                className={`rounded-[7px] px-[14px] py-[7px] text-[12px] font-semibold transition-colors ${
+                  range === opt.key ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-body)] hover:bg-[var(--color-border)]/50"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      <div className="mb-5 grid grid-cols-2 gap-3">
+      <FilterBar />
+      <FilterModal />
+
+      <div className="mb-5 mt-3 grid grid-cols-2 gap-3">
         <ExtremeCard
           label="BEST ENTRY POINT"
           source={data.best.source}
@@ -142,7 +151,7 @@ export default function EntrypointPerformance() {
         <div className="mb-4 font-mono text-[10px] text-[var(--color-faint)]">STAGE-BY-STAGE CONVERSION, PER SOURCE</div>
         <div className="grid grid-cols-3 gap-3 xl:grid-cols-6">
           {data.bySource.map((source) => (
-            <SourceFunnelCard key={source.id} source={source} />
+            <SourceFunnelCard key={source.id} funnelId={funnelId} source={source} />
           ))}
         </div>
       </Panel>

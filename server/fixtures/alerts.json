@@ -1,0 +1,129 @@
+{
+  "firingCount": 3,
+  "rulesConfiguredCount": 12,
+  "summary": {
+    "critical": { "count": 2, "label": "Require immediate action" },
+    "warning": { "count": 1, "label": "Approaching threshold" },
+    "rules": { "count": 12, "statusLabel": "all healthy", "sub": "9 active · 3 muted" }
+  },
+  "active": [
+    {
+      "id": "kyc-upload-spike",
+      "title": "KYC doc upload drop-off spiked to 52%",
+      "subtitle": "Drop-off spike · Guest Checkout funnel · Stage 7",
+      "severity": "critical",
+      "timeAgo": "2h ago",
+      "expanded": true,
+      "metrics": [
+        { "label": "CURRENT VALUE", "value": "52%", "valueTone": "danger", "sub": "Threshold: 35%" },
+        { "label": "USERS AFFECTED", "value": "4,720", "sub": "↑ 1,840 vs. normal" },
+        { "label": "EST. REVENUE IMPACT", "value": "$48.2K", "sub": "per day at current rate" }
+      ],
+      "trend": {
+        "label": "DROP-OFF % — LAST 24 HOURS",
+        "threshold": 35,
+        "tickLabels": ["00:00", "06:00", "12:00", "18:00", "Now"],
+        "points": [29.4, 28.5, 28.7, 27.6, 27.5, 27.0, 27.0, 27.0, 27.0, 27.0, 27.0, 27.0, 29.8, 32.7, 33.2, 35.4, 38.3, 40.9, 42.2, 43.8, 47.0, 47.1, 50.7, 52.0]
+      },
+      "probableCauses": [
+        {
+          "label": "File format validation error on HEIC images",
+          "sub": "iOS 18 users · started after deploy #4891",
+          "pct": 62,
+          "tone": "danger"
+        },
+        {
+          "label": "Upload timeout on slow connections",
+          "sub": "3G/Edge networks · Tier 2 cities",
+          "pct": 24,
+          "tone": "warning"
+        }
+      ],
+      "funnelId": "guest-checkout",
+      "notifiedVia": ["Email", "Teams", "Webhook"]
+    },
+    {
+      "id": "express-pay-conv",
+      "title": "Conversion rate below 8% on Express Pay",
+      "subtitle": "Conversion threshold · Express Pay funnel · End-to-end",
+      "severity": "critical",
+      "timeAgo": "5h ago",
+      "expanded": false
+    },
+    {
+      "id": "otp-error-rate",
+      "title": "OTP verification error rate rising — 4.2%",
+      "subtitle": "Error rate spike · Guest Checkout funnel · Stage 4",
+      "severity": "warning",
+      "timeAgo": "45m ago",
+      "expanded": false
+    }
+  ],
+  "rules": [
+    {
+      "id": "drop-off-spike",
+      "name": "Drop-off spike",
+      "condition": "Any stage > 35% drop · All funnels",
+      "channels": ["Email", "Teams"],
+      "muted": false
+    },
+    {
+      "id": "conversion-threshold",
+      "name": "Conversion threshold",
+      "condition": "End-to-end < 8% · Express Pay",
+      "channels": ["Email", "Webhook"],
+      "muted": false
+    },
+    {
+      "id": "error-rate-spike",
+      "name": "Error rate spike",
+      "condition": "Error > 3% on any step · All funnels",
+      "channels": ["Teams"],
+      "muted": false
+    },
+    {
+      "id": "velocity-slowdown",
+      "name": "Velocity slowdown",
+      "condition": "Median time ↑ 50% vs. baseline · Signup",
+      "channels": ["Email"],
+      "muted": false
+    },
+    {
+      "id": "payment-failure-rate",
+      "name": "Payment failure rate",
+      "condition": "Failure > 5% · Checkout · Muted until Jul 10",
+      "channels": [],
+      "muted": true
+    },
+    {
+      "id": "custom-dau-mau",
+      "name": "Custom: DAU/MAU ratio",
+      "condition": "Stickiness < 20% for 3 consecutive days",
+      "channels": ["Webhook"],
+      "muted": false
+    }
+  ],
+  "timeline": [
+    {
+      "day": "TODAY",
+      "events": [
+        { "title": "KYC drop-off spiked to 52%", "time": "2:14 PM", "status": "Critical", "note": "Still firing", "tone": "critical" },
+        { "title": "Express Pay conv dropped below 8%", "time": "11:30 AM", "status": "Critical", "note": "Still firing", "tone": "critical" },
+        { "title": "OTP error rate rising — 4.2%", "time": "3:45 PM", "status": "Warning", "note": "Still firing", "tone": "warning" }
+      ]
+    },
+    {
+      "day": "YESTERDAY",
+      "events": [
+        { "title": "Cart abandonment spike resolved", "time": "6:12 PM", "note": "Resolved after 4h", "tone": "resolved" },
+        { "title": "Cart abandonment spike — 38%", "time": "2:08 PM", "status": "Warning", "tone": "warning" }
+      ]
+    },
+    {
+      "day": "JUL 1",
+      "events": [
+        { "title": "Signup conv threshold resolved", "time": "10:30 AM", "note": "Resolved after 1d 2h", "tone": "resolved" }
+      ]
+    }
+  ]
+}

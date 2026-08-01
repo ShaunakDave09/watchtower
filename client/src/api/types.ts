@@ -197,6 +197,75 @@ export interface TrendsData {
   };
 }
 
+export interface AlertMetric {
+  label: string;
+  value: string;
+  valueTone?: "danger";
+  sub: string;
+}
+
+export interface AlertTrend {
+  label: string;
+  threshold: number;
+  tickLabels: string[];
+  points: number[];
+}
+
+export interface AlertProbableCause {
+  label: string;
+  sub: string;
+  pct: number;
+  tone: "danger" | "warning";
+}
+
+export interface ActiveAlert {
+  id: string;
+  title: string;
+  subtitle: string;
+  severity: "critical" | "warning";
+  timeAgo: string;
+  expanded: boolean;
+  metrics?: AlertMetric[];
+  trend?: AlertTrend;
+  probableCauses?: AlertProbableCause[];
+  funnelId?: string;
+  notifiedVia?: string[];
+}
+
+export interface AlertRule {
+  id: string;
+  name: string;
+  condition: string;
+  channels: string[];
+  muted: boolean;
+}
+
+export interface TimelineEvent {
+  title: string;
+  time: string;
+  status?: string;
+  note?: string;
+  tone: "critical" | "warning" | "resolved";
+}
+
+export interface TimelineDay {
+  day: string;
+  events: TimelineEvent[];
+}
+
+export interface AlertsData {
+  firingCount: number;
+  rulesConfiguredCount: number;
+  summary: {
+    critical: { count: number; label: string };
+    warning: { count: number; label: string };
+    rules: { count: number; statusLabel: string; sub: string };
+  };
+  active: ActiveAlert[];
+  rules: AlertRule[];
+  timeline: TimelineDay[];
+}
+
 export interface FunnelDetailData {
   id: string;
   name: string;

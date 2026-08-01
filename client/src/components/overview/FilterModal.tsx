@@ -1,11 +1,5 @@
-import type { FilterOptions } from "../../api/types";
-import type { UseFiltersReturn } from "../../hooks/useFilters";
+import { useFiltersContext } from "../../context/FiltersContext";
 import CalendarMonth from "./CalendarMonth";
-
-interface FilterModalProps {
-  filters: UseFiltersReturn;
-  options: FilterOptions;
-}
 
 function FieldSelect({
   label,
@@ -36,8 +30,10 @@ function FieldSelect({
   );
 }
 
-export default function FilterModal({ filters, options }: FilterModalProps) {
-  if (!filters.open) return null;
+export default function FilterModal() {
+  const filters = useFiltersContext();
+  const { options } = filters;
+  if (!filters.open || !options) return null;
 
   const segBase =
     "flex-1 rounded-[7px] border-0 py-2 text-center text-[12.5px] font-medium transition-colors";
