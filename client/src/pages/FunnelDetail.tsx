@@ -7,6 +7,9 @@ import DropoffReasons from "../components/funnelDetail/DropoffReasons";
 import ConversionTrendChart from "../components/funnelDetail/ConversionTrendChart";
 import ComparisonPanel from "../components/funnelDetail/ComparisonPanel";
 import UserTable from "../components/funnelDetail/UserTable";
+import FiltersButton from "../components/filters/FiltersButton";
+import FilterBar from "../components/overview/FilterBar";
+import FilterModal from "../components/overview/FilterModal";
 
 function DetailKpi({
   label,
@@ -79,6 +82,7 @@ export default function FunnelDetail() {
         </div>
         <div className="flex-1" />
         <div className="flex items-center gap-2">
+          <FiltersButton />
           <div className="flex gap-[3px] rounded-[9px] border border-[var(--color-border-strong)] bg-[var(--color-accent-chip)] p-[3px]">
             {(["All", "App", "Web"] as const).map((tab) => (
               <button
@@ -119,7 +123,10 @@ export default function FunnelDetail() {
         </div>
       </div>
 
-      <div className="mb-5 grid grid-cols-4 gap-3">
+      <FilterBar />
+      <FilterModal />
+
+      <div className="mb-5 mt-3 grid grid-cols-4 gap-3">
         <DetailKpi label="TOTAL ENTRIES" value={data.kpis.totalEntries} />
         <DetailKpi
           label="END-TO-END CONV"

@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchFilterOptions, fetchOverview } from "../api/client";
-import type { FilterOptions, OverviewData } from "../api/types";
-import { useFilters } from "../hooks/useFilters";
+import { fetchOverview } from "../api/client";
+import type { OverviewData } from "../api/types";
+import { useFiltersContext } from "../context/FiltersContext";
 import KpiCard from "../components/overview/KpiCard";
 import FunnelChart from "../components/overview/FunnelChart";
 // import RetentionHeatmap from "../components/overview/RetentionHeatmap";
@@ -10,24 +10,20 @@ import TimeToConvertPanel from "../components/overview/TimeToConvertPanel";
 import OpportunityCard from "../components/overview/OpportunityCard";
 import FilterBar from "../components/overview/FilterBar";
 import FilterModal from "../components/overview/FilterModal";
+import FiltersButton from "../components/filters/FiltersButton";
 import Panel from "../components/ui/Panel";
 
 export default function Overview() {
   const navigate = useNavigate();
-  const filters = useFilters();
-  const [options, setOptions] = useState<FilterOptions | null>(null);
+  const filters = useFiltersContext();
   const [data, setData] = useState<OverviewData | null>(null);
-
-  useEffect(() => {
-    fetchFilterOptions().then(setOptions);
-  }, []);
 
   useEffect(() => {
     fetchOverview(filters.filters).then(setData);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.filters]);
 
-  if (!data || !options) {
+  if (!data) {
     return <div className="p-8 font-mono text-sm text-[var(--color-muted)]">Loading…</div>;
   }
 
@@ -40,21 +36,10 @@ export default function Overview() {
           </div>
           <div className="font-mono text-[12px] text-[var(--color-muted)]">{data.updatedLabel}</div>
           <div className="flex-1" />
-          <button
-            onClick={() => filters.setOpen(true)}
-            className="inline-flex items-center gap-[9px] rounded-[9px] border border-[var(--color-border-strong)] bg-[var(--color-card)] px-[14px] py-2 text-[13px] font-medium text-[var(--color-ink)] hover:bg-[var(--color-accent-soft)]"
-          >
-            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-              <path d="M1.5 3h13M4 8h8M6.5 13h3" stroke="var(--color-accent)" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
-            Filters
-            <span className="rounded-full bg-[var(--color-accent)] px-[7px] py-[1px] font-mono text-[10.5px] leading-[1.5] text-white">
-              {filters.chips.length}
-            </span>
-          </button>
+          <FiltersButton />
         </div>
-        <FilterBar filters={filters} />
-        <FilterModal filters={filters} options={options} />
+        <FilterBar />
+        <FilterModal />
       </div>
 
       <div className="grid grid-cols-4 gap-3 px-7 pb-2 pt-2">

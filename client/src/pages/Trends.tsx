@@ -5,6 +5,9 @@ import Panel from "../components/ui/Panel";
 import HourlyThroughputChart from "../components/trends/HourlyThroughputChart";
 import PacingChart from "../components/trends/PacingChart";
 import ConversionTrendMultiLine from "../components/trends/ConversionTrendMultiLine";
+import FiltersButton from "../components/filters/FiltersButton";
+import FilterBar from "../components/overview/FilterBar";
+import FilterModal from "../components/overview/FilterModal";
 
 function LegendDot({ color, label, dashed = false }: { color: string; label: string; dashed?: boolean }) {
   return (
@@ -35,27 +38,34 @@ export default function Trends() {
       <div className="mb-1 flex items-start gap-4">
         <div className="text-[22px] font-semibold tracking-[-0.01em] text-[var(--color-ink)]">Trends</div>
         <div className="flex-1" />
-        <div className="flex gap-[3px] rounded-[9px] border border-[var(--color-border-strong)] bg-[var(--color-accent-chip)] p-[3px]">
-          {(
-            [
-              { key: "7d", label: "Last 7d" },
-              { key: "30d", label: "Last 30d" },
-              { key: "90d", label: "Last 90d" },
-            ] as const
-          ).map((opt) => (
-            <button
-              key={opt.key}
-              onClick={() => setRange(opt.key)}
-              className={`rounded-[7px] px-[14px] py-[7px] text-[12px] font-semibold transition-colors ${
-                range === opt.key ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-body)] hover:bg-[var(--color-border)]/50"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          <FiltersButton />
+          <div className="flex gap-[3px] rounded-[9px] border border-[var(--color-border-strong)] bg-[var(--color-accent-chip)] p-[3px]">
+            {(
+              [
+                { key: "7d", label: "Last 7d" },
+                { key: "30d", label: "Last 30d" },
+                { key: "90d", label: "Last 90d" },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.key}
+                onClick={() => setRange(opt.key)}
+                className={`rounded-[7px] px-[14px] py-[7px] text-[12px] font-semibold transition-colors ${
+                  range === opt.key ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-body)] hover:bg-[var(--color-border)]/50"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
-      <div className="mb-5 font-mono text-[11px] text-[var(--color-faint)]">{data.subtitle}</div>
+
+      <FilterBar />
+      <FilterModal />
+
+      <div className="mb-5 mt-3 font-mono text-[11px] text-[var(--color-faint)]">{data.subtitle}</div>
 
       <div className="mb-3 flex items-center gap-[8px]">
         <span className="h-[7px] w-[7px] rounded-full bg-[var(--color-danger)]" />

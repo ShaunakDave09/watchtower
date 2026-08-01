@@ -4,6 +4,9 @@ import { fetchFunnelComparison } from "../api/client";
 import type { ComparisonData } from "../api/types";
 import Panel from "../components/ui/Panel";
 import FunnelChart from "../components/overview/FunnelChart";
+import FiltersButton from "../components/filters/FiltersButton";
+import FilterBar from "../components/overview/FilterBar";
+import FilterModal from "../components/overview/FilterModal";
 
 function ComparisonKpiCard({
   label,
@@ -74,6 +77,7 @@ export default function FunnelComparison() {
         </div>
         <div className="flex-1" />
         <div className="flex items-center gap-3">
+          <FiltersButton />
           <div className="rounded-[9px] border border-[var(--color-border-strong)] bg-[var(--color-card)] px-[14px] py-[7px]">
             <div className="flex items-center gap-[6px] font-mono text-[9px] tracking-[0.06em] text-[var(--color-faint)]">
               <span className="h-[7px] w-[7px] rounded-full bg-[var(--color-accent)]" />
@@ -92,7 +96,10 @@ export default function FunnelComparison() {
         </div>
       </div>
 
-      <div className="mb-5 flex items-center gap-[10px]">
+      <FilterBar />
+      <FilterModal />
+
+      <div className="mb-5 mt-3 flex items-center gap-[10px]">
         <span className="font-mono text-[10px] tracking-[0.06em] text-[var(--color-faint)]">QUICK COMPARE</span>
         {data.quickCompare.map((opt) => (
           <button
