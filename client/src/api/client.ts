@@ -43,6 +43,10 @@ export function fetchFunnelEntrypoints(funnelId: string): Promise<EntrypointData
   return getJson(`/api/funnels/${funnelId}/entrypoints`);
 }
 
+export function fetchEntrypointSourceDetail(funnelId: string, sourceId: string): Promise<FunnelDetailData> {
+  return getJson(`/api/funnels/${funnelId}/entrypoints/${sourceId}`);
+}
+
 export function fetchFunnelComparison(funnelId: string): Promise<ComparisonData> {
   return getJson(`/api/funnels/${funnelId}/compare`);
 }

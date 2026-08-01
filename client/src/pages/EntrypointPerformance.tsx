@@ -151,7 +151,7 @@ export default function EntrypointPerformance() {
         <div className="mb-4 font-mono text-[10px] text-[var(--color-faint)]">STAGE-BY-STAGE CONVERSION, PER SOURCE</div>
         <div className="grid grid-cols-3 gap-3 xl:grid-cols-6">
           {data.bySource.map((source) => (
-            <SourceFunnelCard key={source.id} source={source} />
+            <SourceFunnelCard key={source.id} funnelId={funnelId} source={source} />
           ))}
         </div>
       </Panel>
