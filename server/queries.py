@@ -70,12 +70,9 @@ def fetch_overview_funnel_steps(
         "date_from": date_from,
         "date_to": date_to,
     }
-    # with db.get_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
-    #     cur.execute(query, params)
-    #     rows = cur.fetchall()
     pool = db.get_connection()
     with pool.connection() as conn:
-        with conn.cursor() as cur:
+        with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(query, params)
             rows = cur.fetchall()
     return _rows_to_steps(rows)
@@ -92,13 +89,37 @@ def fetch_funnel_stages(journey_name: str) -> list[dict]:
         GROUP BY "STAGE_ORDER", "STAGE_NAMES"
         ORDER BY "STAGE_ORDER"
     """
-    # with db.get_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
-    #     cur.execute(query, {"journey_name": journey_name})
-    #     rows = cur.fetchall()
-
     pool = db.get_connection()
     with pool.connection() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(query, {"journey_name": journey_name})
             rows = cur.fetchall()
     return _rows_to_steps(rows)
+
+
+# Maps FilterOptions keys (client/src/api/types.ts) to the corresponding
+# quoted column name in HORIZONTAL_SUMMARY_TABLE.
+FILTER_COLUMNS = {
+    "business": "BUSINESS",
+    "product": "PRODUCT",
+    "subProduct": "SUB_PRODUCT",
+    "journey": "Journey_name",
+    "version": "ENTRYPOINT_STAGE",
+}
+
+
+def fetch_filter_options() -> dict:
+    """Distinct, non-null values for each filter dropdown, straight from the
+    warehouse. Shape matches FilterOptions exactly, so the router can return
+    this (or the fixture) with no frontend changes either way."""
+    pool = db.get_connection()
+    options: dict[str, list[str]] = {}
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            for key, column in FILTER_COLUMNS.items():
+                cur.execute(
+                    f'SELECT DISTINCT "{column}" FROM {HORIZONTAL_SUMMARY_TABLE} '
+                    f'WHERE "{column}" IS NOT NULL ORDER BY "{column}"'
+                )
+                options[key] = [row[0] for row in cur.fetchall()]
+    return options
