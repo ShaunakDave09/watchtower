@@ -1,10 +1,27 @@
 command: ["python", "-m", "server.app"]
 
+# env:
+#   # Name of the Lakebase database instance, used to mint Postgres OAuth
+#   # credentials via the Databricks SDK. PGHOST/PGPORT/PGDATABASE/PGUSER/
+#   # PGSSLMODE are injected automatically once the instance is attached to
+#   # this app as a resource (App page -> Configure -> + Add resource ->
+#   # Database) — they don't go here.
+#   - name: "LAKEBASE_INSTANCE_NAME"
+#     value: "databricks_postgres"
+
+
 env:
-  # Name of the Lakebase database instance, used to mint Postgres OAuth
-  # credentials via the Databricks SDK. PGHOST/PGPORT/PGDATABASE/PGUSER/
-  # PGSSLMODE are injected automatically once the instance is attached to
-  # this app as a resource (App page -> Configure -> + Add resource ->
-  # Database) — they don't go here.
-  - name: "LAKEBASE_INSTANCE_NAME"
-    value: "digital360"
+  - name: PGHOST
+    value: 'ep-shy-paper-e7a225z3.database.centralindia.azuredatabricks.net'
+  - name: PGDATABASE
+    value: 'databricks_postgres'
+  - name: PGUSER
+    value: 'fde61010-f038-4cdc-a351-9f0a5bfa04e0'
+  - name: PGPORT
+    value: '5432'
+  - name: PGSSLMODE
+    value: 'require'
+  - name: ENDPOINT_NAME
+    value: 'projects/digital360/branches/production/endpoints/primary'
+
+    

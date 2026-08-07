@@ -1,13 +1,13 @@
 import os
 
 from psycopg.rows import dict_row
-
 from server import db
+
 
 # schema.table of the Lakebase-synced copy of
 # bfl_std_lake.digital360.horizontal_summary_daily
 HORIZONTAL_SUMMARY_TABLE = os.environ.get(
-    "HORIZONTAL_SUMMARY_TABLE", "digital360.horizontal_summary_daily"
+    "HORIZONTAL_SUMMARY_TABLE", "digital360.business_funnel_daily"
 )
 
 
@@ -26,7 +26,7 @@ def _rows_to_steps(rows: list[dict]) -> list[dict]:
         steps.append(
             {
                 "step": i + 1,
-                "label": row["stage_names"],
+                "label": row["STAGE_NAMES"],
                 "users": users,
                 "convPct": conv_pct,
                 "dropPct": drop_pct,
@@ -48,17 +48,17 @@ def fetch_overview_funnel_steps(
     date_to: str,
 ) -> list[dict]:
     query = f"""
-        SELECT stage_order, stage_names, SUM(users) AS users
+        SELECT "STAGE_ORDER", "STAGE_NAMES", SUM(users) AS users
         FROM {HORIZONTAL_SUMMARY_TABLE}
-        WHERE business = %(business)s
-          AND product = %(product)s
-          AND sub_product = %(sub_product)s
-          AND journey_name = %(journey)s
-          AND ep_platform = %(platform)s
-          AND entrypoint_stage = %(version)s
-          AND date BETWEEN %(date_from)s AND %(date_to)s
-        GROUP BY stage_order, stage_names
-        ORDER BY stage_order
+        WHERE "BUSINESS" = %(business)s
+          AND "PRODUCT"= %(product)s
+          AND "SUB_PRODUCT" = %(sub_product)s
+          AND "Journey_name" = %(journey)s
+          AND "EP_PLATFORM" = %(platform)s
+          AND "ENTRYPOINT_STAGE" = %(version)s
+          AND "DATE" BETWEEN %(date_from)s AND %(date_to)s
+        GROUP BY "STAGE_ORDER", "STAGE_NAMES"
+        ORDER BY "STAGE_ORDER"
     """
     params = {
         "business": business,
@@ -70,9 +70,14 @@ def fetch_overview_funnel_steps(
         "date_from": date_from,
         "date_to": date_to,
     }
-    with db.get_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
-        cur.execute(query, params)
-        rows = cur.fetchall()
+    # with db.get_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+    #     cur.execute(query, params)
+    #     rows = cur.fetchall()
+    pool = db.get_connection()
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, params)
+            rows = cur.fetchall()
     return _rows_to_steps(rows)
 
 
@@ -81,13 +86,19 @@ def fetch_funnel_stages(journey_name: str) -> list[dict]:
     # platform/version/date filters from the frontend, so this aggregates
     # across all of them for the given journey.
     query = f"""
-        SELECT stage_order, stage_names, SUM(users) AS users
+        SELECT "STAGE_ORDER", "STAGE_NAMES", SUM(users) AS users
         FROM {HORIZONTAL_SUMMARY_TABLE}
-        WHERE lower(journey_name) = lower(%(journey_name)s)
-        GROUP BY stage_order, stage_names
-        ORDER BY stage_order
+        WHERE lower("Journey_name") = lower(%(journey_name)s)
+        GROUP BY "STAGE_ORDER", "STAGE_NAMES"
+        ORDER BY "STAGE_ORDER"
     """
-    with db.get_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
-        cur.execute(query, {"journey_name": journey_name})
-        rows = cur.fetchall()
+    # with db.get_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+    #     cur.execute(query, {"journey_name": journey_name})
+    #     rows = cur.fetchall()
+
+    pool = db.get_connection()
+    with pool.connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(query, {"journey_name": journey_name})
+            rows = cur.fetchall()
     return _rows_to_steps(rows)
