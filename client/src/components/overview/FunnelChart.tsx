@@ -26,6 +26,19 @@ export default function FunnelChart({
   const uid = useId();
   const gradFill = `fc-fill-${uid}`;
   const gradFinal = `fc-final-${uid}`;
+
+  // A live query can legitimately match zero rows for a filter combination
+  // (see the "steps is not None" handling in server/routers/overview.py) —
+  // that's real information, not a loading/error state, so show it plainly
+  // instead of dividing by steps.length below or indexing rows[-1].
+  if (steps.length === 0) {
+    return (
+      <div className="flex h-[140px] items-center justify-center rounded-lg border border-dashed border-[var(--color-border-strong)] font-mono text-[12px] text-[var(--color-muted)]">
+        No data for this filter selection
+      </div>
+    );
+  }
+
   const height = TOP_PAD * 2 + steps.length * ROW_H + (steps.length - 1) * ROW_GAP;
 
   const rows: Row[] = steps.map((step, i) => {

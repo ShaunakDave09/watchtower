@@ -23,7 +23,11 @@ def get_funnel_detail(funnel_id: str) -> dict:
         stages = queries.fetch_funnel_stages(funnel_id.replace("-", " "))
     except Exception:
         logger.exception("fetch_funnel_stages failed, falling back to fixture stages")
-        stages = []
-    if stages:
+        stages = None
+    # See the matching comment in overview.py: `is not None` (not a
+    # truthiness check) so a query that legitimately matched zero rows
+    # ("no data for this journey") is shown as-is instead of being masked
+    # by the fixture.
+    if stages is not None:
         data["stages"] = stages
     return data
