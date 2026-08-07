@@ -15,6 +15,13 @@ router = APIRouter(prefix="/api", tags=["overview"])
 
 @router.get("/filters")
 def get_filters() -> dict:
+    try:
+        options = queries.fetch_filter_options()
+    except Exception:
+        logger.exception("fetch_filter_options failed, falling back to fixture filters")
+        options = None
+    if options and all(options.values()):
+        return options
     return json.loads((FIXTURES_DIR / "filters.json").read_text())
 
 
