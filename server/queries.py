@@ -1,7 +1,10 @@
+import logging
 import os
 
 from psycopg.rows import dict_row
 from server import db
+
+logger = logging.getLogger(__name__)
 
 
 # schema.table of the Lakebase-synced copy of
@@ -36,6 +39,67 @@ def _rows_to_steps(rows: list[dict]) -> list[dict]:
     return steps
 
 
+# fetch_overview_funnel_steps's WHERE clause, as (log_name, SQL predicate)
+# pairs in the order they're applied. Used both to build the real query and,
+# on a genuine zero-row result, to work out which single predicate is
+# responsible — see _diagnose_empty_overview_result below.
+_OVERVIEW_PREDICATES: list[tuple[str, str]] = [
+    ("business", '"BUSINESS" = %(business)s'),
+    ("product", '"PRODUCT" = %(product)s'),
+    ("sub_product", '"SUB_PRODUCT" = %(sub_product)s'),
+    ("journey", '"Journey_name" = %(journey)s'),
+    ("platform", '"EP_PLATFORM" = %(platform)s'),
+    ("version", '"ENTRYPOINT_STAGE" = %(version)s'),
+    ("date_range", '"DATE" BETWEEN %(date_from)s AND %(date_to)s'),
+]
+
+
+def _diagnose_empty_overview_result(params: dict) -> None:
+    """Best-effort: fetch_overview_funnel_steps matched zero rows for this
+    exact combination — figure out *which* predicate is responsible instead
+    of leaving it a mystery.
+
+    Two of the seven predicates above (platform, date_range) aren't covered
+    by fetch_filter_options's cascade: `platform` comes from a hardcoded
+    App/Web toggle in the frontend rather than real EP_PLATFORM values, and
+    the date range starts from a hardcoded default rather than the table's
+    actual DATE span. So a mismatch there is invisible to the dropdowns —
+    everything can look like a valid, cascaded selection and still match
+    zero rows. business/product/sub_product/journey/version *are* covered
+    by the cascade, so if one of those is the culprit instead, something
+    upstream let an invalid combination through.
+
+    Re-runs the query, adding one predicate at a time in the same order
+    it's applied, and logs the row count after each addition — the first
+    predicate that drops the count to zero is almost certainly the cause.
+    Only ever called after the real query already came back empty, so a
+    handful of extra COUNT(*) queries here is a fine trade for turning "the
+    funnel is empty, no idea why" into a specific answer in the app logs.
+    """
+    try:
+        pool = db.get_connection()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                clauses: list[str] = []
+                for name, predicate in _OVERVIEW_PREDICATES:
+                    clauses.append(predicate)
+                    cur.execute(
+                        f'SELECT COUNT(*) FROM {HORIZONTAL_SUMMARY_TABLE} WHERE {" AND ".join(clauses)}',
+                        params,
+                    )
+                    count = cur.fetchone()[0]
+                    logger.error("  ...after %s=%r: %d matching rows", name, params.get(name), count)
+                    if count == 0:
+                        logger.error(
+                            "fetch_overview_funnel_steps: %r eliminated every remaining row — "
+                            "this is almost certainly why the funnel shows no data for this selection",
+                            name,
+                        )
+                        return
+    except Exception:
+        logger.exception("Also failed to run empty-result diagnostics")
+
+
 def fetch_overview_funnel_steps(
     *,
     business: str,
@@ -50,13 +114,7 @@ def fetch_overview_funnel_steps(
     query = f"""
         SELECT "STAGE_ORDER", "STAGE_NAMES", SUM(users) AS users
         FROM {HORIZONTAL_SUMMARY_TABLE}
-        WHERE "BUSINESS" = %(business)s
-          AND "PRODUCT"= %(product)s
-          AND "SUB_PRODUCT" = %(sub_product)s
-          AND "Journey_name" = %(journey)s
-          AND "EP_PLATFORM" = %(platform)s
-          AND "ENTRYPOINT_STAGE" = %(version)s
-          AND "DATE" BETWEEN %(date_from)s AND %(date_to)s
+        WHERE {" AND ".join(predicate for _, predicate in _OVERVIEW_PREDICATES)}
         GROUP BY "STAGE_ORDER", "STAGE_NAMES"
         ORDER BY "STAGE_ORDER"
     """
@@ -75,6 +133,9 @@ def fetch_overview_funnel_steps(
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(query, params)
             rows = cur.fetchall()
+    if not rows:
+        logger.error("fetch_overview_funnel_steps matched 0 rows for params=%r", params)
+        _diagnose_empty_overview_result(params)
     return _rows_to_steps(rows)
 
 
