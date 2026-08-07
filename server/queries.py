@@ -100,6 +100,27 @@ def _diagnose_empty_overview_result(params: dict) -> None:
         logger.exception("Also failed to run empty-result diagnostics")
 
 
+def _to_table_date(iso_date: str) -> str:
+    """The DATE column doesn't hold real SQL dates — it holds 'YYYYMMDD'
+    strings (e.g. "20260401"). The frontend's date picker and the /api/
+    overview query params both deal in ordinary ISO 'YYYY-MM-DD' dates
+    (e.g. "2026-04-01"), which is the right format for that layer — nothing
+    else in the app needs to know the warehouse stores dates this way. So
+    the ISO -> table-native conversion happens here, at the one place that
+    actually builds the SQL, rather than leaking the table's storage quirk
+    out to the API contract or the UI.
+
+    Plain string-slicing (not a real date parse) because the input is
+    already a validated "YYYY-MM-DD" string by construction — it comes from
+    either the calendar widget or a hardcoded default, never free text.
+    Stripping the dashes keeps it a zero-padded, fixed-width digit string,
+    which sorts identically to the dates it represents, so BETWEEN still
+    does the right thing whether the column turns out to be text or
+    integer.
+    """
+    return iso_date.replace("-", "")
+
+
 def fetch_overview_funnel_steps(
     *,
     business: str,
@@ -125,8 +146,8 @@ def fetch_overview_funnel_steps(
         "journey": journey,
         "platform": platform,
         "version": version,
-        "date_from": date_from,
-        "date_to": date_to,
+        "date_from": _to_table_date(date_from),
+        "date_to": _to_table_date(date_to),
     }
     pool = db.get_connection()
     with pool.connection() as conn:
