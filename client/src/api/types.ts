@@ -6,6 +6,13 @@ export interface FilterOptions {
   version: string[];
 }
 
+// What's currently picked for the upstream fields in the filter cascade
+// (business -> product -> subProduct -> journey -> version). Passed to
+// fetchFilterOptions so the backend can narrow each field's dropdown to
+// values that actually co-occur with what's already selected above it.
+// `version` never appears here — nothing comes after it to narrow.
+export type FilterSelection = Pick<FilterState, "business" | "product" | "subProduct" | "journey">;
+
 export interface FilterState {
   business: string;
   product: string;

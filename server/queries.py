@@ -97,29 +97,82 @@ def fetch_funnel_stages(journey_name: str) -> list[dict]:
     return _rows_to_steps(rows)
 
 
-# Maps FilterOptions keys (client/src/api/types.ts) to the corresponding
-# quoted column name in HORIZONTAL_SUMMARY_TABLE.
-FILTER_COLUMNS = {
-    "business": "BUSINESS",
-    "product": "PRODUCT",
-    "subProduct": "SUB_PRODUCT",
-    "journey": "Journey_name",
-    "version": "ENTRYPOINT_STAGE",
-}
+# FilterOptions keys (client/src/api/types.ts), in the same order the filter
+# modal shows them: BUSINESS -> PRODUCT -> SUB-PRODUCT -> JOURNEY -> VERSION.
+# That order is also the *cascade* hierarchy: each field's dropdown should
+# only offer values that actually co-occur with whatever was picked for the
+# fields above it (picking BUSINESS="Retail" should narrow PRODUCT down to
+# products that exist under Retail, and so on). FILTER_COLUMNS pairs each
+# key with its quoted column name in HORIZONTAL_SUMMARY_TABLE, in that same
+# cascade order.
+FILTER_COLUMNS: list[tuple[str, str]] = [
+    ("business", "BUSINESS"),
+    ("product", "PRODUCT"),
+    ("subProduct", "SUB_PRODUCT"),
+    ("journey", "Journey_name"),
+    ("version", "ENTRYPOINT_STAGE"),
+]
 
 
-def fetch_filter_options() -> dict:
+def fetch_filter_options(
+    *,
+    business: str | None = None,
+    product: str | None = None,
+    sub_product: str | None = None,
+    journey: str | None = None,
+) -> dict:
     """Distinct, non-null values for each filter dropdown, straight from the
-    warehouse. Shape matches FilterOptions exactly, so the router can return
-    this (or the fixture) with no frontend changes either way."""
+    warehouse — optionally narrowed by whatever the caller already has
+    selected upstream in the cascade.
+
+    `business`/`product`/`sub_product`/`journey` are the *currently selected*
+    values for those fields (or None if nothing's selected yet). Each of
+    them constrains every column that comes after it in FILTER_COLUMNS: e.g.
+    passing business="Retail" narrows the product, sub-product, journey, and
+    version lists to rows where BUSINESS = 'Retail', but the business list
+    itself stays unfiltered (it's the top of the hierarchy, nothing narrows
+    it). This mirrors how a human would explore the data top-down, and it's
+    exactly what the frontend needs to keep the dropdowns from ever showing
+    a combination that doesn't actually exist together.
+
+    Shape of the return value matches FilterOptions exactly, so the router
+    can return this (or the fixture) with no frontend changes either way.
+    """
+    # Selected values, keyed by FilterOptions key, in cascade order — used
+    # below to build the WHERE clause for each column from whatever's
+    # already been picked "above" it.
+    selected: dict[str, str | None] = {
+        "business": business,
+        "product": product,
+        "subProduct": sub_product,
+        "journey": journey,
+        # "version" has nothing after it to narrow, so it's never a filter
+        # input here — only an output.
+    }
+
     pool = db.get_connection()
     options: dict[str, list[str]] = {}
     with pool.connection() as conn:
         with conn.cursor() as cur:
-            for key, column in FILTER_COLUMNS.items():
+            for i, (key, column) in enumerate(FILTER_COLUMNS):
+                # Only the fields *above* this one in the cascade (i.e.
+                # earlier in FILTER_COLUMNS) narrow its options, and only
+                # when the caller actually selected something for them.
+                upstream = [
+                    (upstream_column, selected[upstream_key])
+                    for upstream_key, upstream_column in FILTER_COLUMNS[:i]
+                    if selected.get(upstream_key)
+                ]
+                where_clauses = [f'"{column}" IS NOT NULL']
+                params: dict[str, str] = {}
+                for j, (upstream_column, value) in enumerate(upstream):
+                    param_name = f"upstream_{j}"
+                    where_clauses.append(f'"{upstream_column}" = %({param_name})s')
+                    params[param_name] = value
                 cur.execute(
                     f'SELECT DISTINCT "{column}" FROM {HORIZONTAL_SUMMARY_TABLE} '
-                    f'WHERE "{column}" IS NOT NULL ORDER BY "{column}"'
+                    f'WHERE {" AND ".join(where_clauses)} ORDER BY "{column}"',
+                    params,
                 )
                 options[key] = [row[0] for row in cur.fetchall()]
     return options

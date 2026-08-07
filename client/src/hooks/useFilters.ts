@@ -1,6 +1,14 @@
 import { useMemo, useState } from "react";
 import type { FilterState } from "../api/types";
 
+// Just a starting guess, shown before the real filter options have loaded
+// (and used as-is if the backend ever has to fall back to the static
+// fixture, whose values match these). Once FiltersContext fetches the real
+// business/product/subProduct/journey/version lists from Postgres, it
+// snaps any of these that don't actually exist in the live data to the
+// first real option for that field — see the cascade-correction effect
+// there. So these don't need to be "correct" for any particular warehouse,
+// only a reasonable placeholder.
 const DEFAULTS: FilterState = {
   business: "Payments",
   product: "Checkout",
