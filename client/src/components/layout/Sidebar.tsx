@@ -35,7 +35,7 @@ function rowContent(icon: NavIconName, label: string, active: boolean, collapsed
 }
 
 function NavRow({ to, icon, label, badge, collapsed = false }: NavItemProps) {
-  const base = `flex items-center gap-[10px] rounded-[9px] px-[11px] py-[9px] text-[13px] ${collapsed ? "justify-center px-0" : ""}`;
+  const base = `group flex items-center gap-[10px] rounded-[9px] px-[11px] py-[9px] text-[13px] ${collapsed ? "justify-center px-0" : ""}`;
 
   if (!to) {
     return (
