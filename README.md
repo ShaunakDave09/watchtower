@@ -91,10 +91,42 @@ real edge case now that the query actually runs.
 Backend (from repo root):
 
 Locally there's no attached app resource to inject `PGHOST`/`PGDATABASE`/
-`PGUSER`, and no app service principal — connect as yourself instead:
-`databricks auth login` against the workspace that owns the Lakebase
-instance, then export `PGHOST`, `PGDATABASE`, and `PGUSER` (your own
-Databricks username) to match your Lakebase project's connection details.
+`PGUSER`, and no app service principal, so `server/db.py` picks between two
+connection modes based on whether `PGPASSWORD` is set (see `_use_oauth()` in
+that file):
+
+- **A local Postgres instance (recommended for day-to-day dev)** — set the
+  standard libpq env vars, including `PGPASSWORD`, pointing at your local
+  database:
+
+  ```bash
+  export PGHOST=localhost
+  export PGPORT=5432
+  export PGDATABASE=watchtower
+  export PGUSER=postgres
+  export PGPASSWORD=postgres        # presence of this is what selects plain-password mode
+  ```
+
+  With `PGPASSWORD` set, `db.py` connects with an ordinary password (via
+  libpq, no Databricks SDK call involved) instead of minting an OAuth token,
+  and defaults `PGSSLMODE` to `prefer` instead of `require` since a local
+  instance usually isn't configured for TLS. Just make sure
+  `digital360.business_funnel_daily` (or whatever `HORIZONTAL_SUMMARY_TABLE`
+  is set to) exists in that database with the columns listed above.
+
+- **The real Lakebase instance, from your machine** — connect as yourself:
+  `databricks auth login` against the workspace that owns the Lakebase
+  instance, then export `PGHOST`, `PGDATABASE`, and `PGUSER` (your own
+  Databricks username) to match your Lakebase project's connection details,
+  and `ENDPOINT_NAME` as in `app.yaml`. Leave `PGPASSWORD` unset — that's what
+  tells `db.py` to mint short-lived OAuth tokens via the Databricks SDK
+  instead, same as it does when deployed.
+
+Once deployed to Databricks Apps, the attached database resource injects
+`PGHOST`/`PGPORT`/`PGDATABASE`/`PGUSER`/`PGSSLMODE` automatically (see
+"Lakebase setup" above) with no `PGPASSWORD` in sight, so the app
+transparently switches back to OAuth in that environment — no code or config
+changes needed between local and deployed.
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
