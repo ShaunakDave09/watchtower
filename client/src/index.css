@@ -98,3 +98,88 @@ body {
     opacity: 1;
   }
 }
+
+/* Sidebar nav icon hover animations (client/src/components/layout/NavIcons.tsx).
+   Triggered via Tailwind's group-hover, so hovering anywhere on a nav row
+   plays the animation on its icon — no JS animation library involved, just
+   these keyframes plus each icon wiring `group-hover:[animation:...]` to
+   the shape(s) it wants to move. */
+
+/* "Draws" a stroke on hover, using the pathLength=1 trick so every icon can
+   share one keyframe regardless of its actual path length in user units. */
+@keyframes nav-icon-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Bell (Alerts): a quick ring, decaying back to rest. */
+@keyframes nav-icon-ring {
+  0% {
+    transform: rotate(0deg);
+  }
+  20% {
+    transform: rotate(14deg);
+  }
+  40% {
+    transform: rotate(-10deg);
+  }
+  60% {
+    transform: rotate(6deg);
+  }
+  80% {
+    transform: rotate(-4deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+/* Users (Cohorts): a light bounce. */
+@keyframes nav-icon-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-1.5px);
+  }
+}
+
+/* Layout dashboard (Overview): each tile dips briefly, staggered per-tile
+   via animation-delay set inline on the element. */
+@keyframes nav-icon-pop {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.8);
+  }
+}
+
+/* Route (Entrypoint Performance): the two endpoint dots pulse. */
+@keyframes nav-icon-dot-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.4);
+  }
+}
+
+/* Link (Integrations): each half nudges apart then reconnects — direction
+   set per-path via the --nav-icon-shift-x/y custom properties. */
+@keyframes nav-icon-link-shift {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(var(--nav-icon-shift-x, 0px), var(--nav-icon-shift-y, 0px));
+  }
+}
