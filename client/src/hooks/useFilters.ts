@@ -11,14 +11,11 @@ import type { FilterState } from "../api/types";
 // there. So these don't need to be "correct" for any particular warehouse,
 // only a reasonable placeholder.
 //
-// journey/version/platform/month default to ALL_FILTER_VALUE rather than a
-// specific guess: unlike business/product/subProduct (which always need one
-// real value to mean anything), these are optional refinements the user
-// picks manually — starting on "All" shows the aggregate across every
-// journey/version/platform/month rather than an arbitrarily-narrowed one.
-// platform used to default to the literal "App" because it was a hardcoded
-// toggle rather than a real column value — now that it's sourced from the
-// table like everything else, it gets the same "All" treatment.
+// journey/version/month default to ALL_FILTER_VALUE rather than a specific
+// guess: unlike business/product/subProduct (which always need one real
+// value to mean anything), these are optional refinements the user picks
+// manually — starting on "All" shows the aggregate across every journey/
+// version/month rather than an arbitrarily-narrowed one.
 const DEFAULTS: FilterState = {
   business: "Payments",
   product: "Checkout",
@@ -26,7 +23,7 @@ const DEFAULTS: FilterState = {
   journey: ALL_FILTER_VALUE,
   version: ALL_FILTER_VALUE,
   month: ALL_FILTER_VALUE,
-  platform: ALL_FILTER_VALUE,
+  platform: "App",
   from: "2026-04-01",
   to: "2026-06-30",
 };
