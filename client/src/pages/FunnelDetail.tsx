@@ -16,13 +16,15 @@ export default function FunnelDetail() {
 
   useEffect(() => {
     setError(null);
-    fetchFunnelDetail(funnelId ?? "guest-checkout", filters.filters.journey)
+    fetchFunnelDetail(funnelId ?? "guest-checkout", filters.filters)
       .then(setData)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
-    // Refetch when the selected journey changes (e.g. cascade-corrected on
-    // load, or the user picks a different one in the filter modal) so the
-    // stage breakdown always matches what the filter bar shows as active.
-  }, [funnelId, filters.filters.journey, reloadKey]);
+    // Refetch whenever any active filter changes (journey, business,
+    // platform, dates, ...) so the stage breakdown always matches what the
+    // Filters button/bar on this page shows as active — same dependency
+    // shape as Overview's fetch effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [funnelId, filters.filters, reloadKey]);
 
   if (error) {
     return <LoadError message={error} onRetry={() => setReloadKey((k) => k + 1)} />;
