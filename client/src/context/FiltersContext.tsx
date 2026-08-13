@@ -14,8 +14,11 @@ const FiltersContext = createContext<FiltersContextValue | null>(null);
 // Cascade order: business -> product -> subProduct -> journey -> version.
 // Each field's real options only make sense given whatever's picked above
 // it, so this is also the order we check for (and correct) an invalid
-// selection in — see the effect below.
-const CASCADE_KEYS: (keyof FilterOptions)[] = ["business", "product", "subProduct", "journey", "version"];
+// selection in — see the effect below. `month` is appended even though it
+// isn't part of this cascade (nothing narrows it, and it narrows nothing
+// downstream) purely so a stale/removed month selection still gets snapped
+// back to a real option whenever this correction pass happens to run.
+const CASCADE_KEYS: (keyof FilterOptions)[] = ["business", "product", "subProduct", "journey", "version", "month"];
 
 export function FiltersProvider({ children }: { children: ReactNode }) {
   const filters = useFilters();

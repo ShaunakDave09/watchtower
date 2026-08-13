@@ -11,17 +11,18 @@ import type { FilterState } from "../api/types";
 // there. So these don't need to be "correct" for any particular warehouse,
 // only a reasonable placeholder.
 //
-// journey/version default to ALL_FILTER_VALUE rather than a specific guess:
-// unlike business/product/subProduct (which always need one real value to
-// mean anything), these two are optional refinements the user picks
+// journey/version/month default to ALL_FILTER_VALUE rather than a specific
+// guess: unlike business/product/subProduct (which always need one real
+// value to mean anything), these are optional refinements the user picks
 // manually — starting on "All" shows the aggregate across every journey/
-// version rather than an arbitrarily-narrowed one.
+// version/month rather than an arbitrarily-narrowed one.
 const DEFAULTS: FilterState = {
   business: "Payments",
   product: "Checkout",
   subProduct: "Express Pay",
   journey: ALL_FILTER_VALUE,
   version: ALL_FILTER_VALUE,
+  month: ALL_FILTER_VALUE,
   platform: "App",
   from: "2026-04-01",
   to: "2026-06-30",
@@ -135,6 +136,7 @@ export function useFilters() {
     { cat: "Sub-product", val: filters.subProduct },
     { cat: "Journey", val: filters.journey },
     { cat: "Version", val: filters.version },
+    { cat: "Month", val: filters.month },
     { cat: "Platform", val: filters.platform },
     { cat: "Dates", val: `${fmtShort(filters.from)} – ${filters.to ? fmtShort(filters.to) : "…"}` },
   ];

@@ -29,6 +29,7 @@ def get_funnel_detail(
     journey: str = Query(...),
     platform: str = Query(...),
     version: str = Query(...),
+    month: str = Query(...),
     date_from: str = Query(..., alias="from"),
     date_to: str = Query(..., alias="to"),
 ) -> dict:
@@ -37,18 +38,19 @@ def get_funnel_detail(
     # dropoffReasons/trend/comparison/userTable stay on fixtures for now —
     # horizontal_summary_daily only backs the stage breakdown.
     try:
-        stages = queries.fetch_funnel_stages(
+        stages = queries.fetch_funnel_steps(
             business=business,
             product=product,
             sub_product=sub_product,
             journey=journey,
             platform=platform,
             version=version,
+            month=month,
             date_from=date_from,
             date_to=date_to,
         )
     except Exception:
-        logger.exception("fetch_funnel_stages failed, falling back to fixture stages")
+        logger.exception("fetch_funnel_steps failed, falling back to fixture stages")
         stages = None
     # See the matching comment in overview.py: `is not None` (not a
     # truthiness check) so a query that legitimately matched zero rows

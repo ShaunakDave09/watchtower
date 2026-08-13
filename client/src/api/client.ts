@@ -42,6 +42,7 @@ export function fetchOverview(filters: FilterState): Promise<OverviewData> {
     journey: filters.journey,
     platform: filters.platform,
     version: filters.version,
+    month: filters.month,
     from: filters.from,
     to: filters.to,
   });
@@ -60,6 +61,7 @@ export function fetchFunnelDetail(funnelId: string, filters: FilterState): Promi
     journey: filters.journey,
     platform: filters.platform,
     version: filters.version,
+    month: filters.month,
     from: filters.from,
     to: filters.to,
   });
