@@ -1,6 +1,7 @@
 import json
 import logging
 from pathlib import Path
+from typing import Optional
 
 from fastapi import APIRouter, Query
 
@@ -20,10 +21,10 @@ def get_filters(
     # frontend has a selection, it re-calls this with whatever's picked so
     # far so downstream dropdowns only offer values that actually co-occur
     # with it — see fetch_filter_options's docstring for the cascade rules.
-    business: str | None = Query(None),
-    product: str | None = Query(None),
-    sub_product: str | None = Query(None, alias="subProduct"),
-    journey: str | None = Query(None),
+    business: Optional[str] = Query(None),
+    product: Optional[str] = Query(None),
+    sub_product: Optional[str] = Query(None, alias="subProduct"),
+    journey: Optional[str] = Query(None),
 ) -> dict:
     try:
         options = queries.fetch_filter_options(

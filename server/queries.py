@@ -1,5 +1,6 @@
 import logging
 import os
+from typing import Optional
 
 from psycopg.rows import dict_row
 from server import db
@@ -339,10 +340,10 @@ FILTER_COLUMNS: list[tuple[str, str]] = [
 
 def fetch_filter_options(
     *,
-    business: str | None = None,
-    product: str | None = None,
-    sub_product: str | None = None,
-    journey: str | None = None,
+    business: Optional[str] = None,
+    product: Optional[str] = None,
+    sub_product: Optional[str] = None,
+    journey: Optional[str] = None,
 ) -> dict:
     """Distinct, non-null values for each filter dropdown, straight from the
     warehouse — optionally narrowed by whatever the caller already has
@@ -364,7 +365,7 @@ def fetch_filter_options(
     # Selected values, keyed by FilterOptions key, in cascade order — used
     # below to build the WHERE clause for each column from whatever's
     # already been picked "above" it.
-    selected: dict[str, str | None] = {
+    selected: dict[str, Optional[str]] = {
         "business": business,
         "product": product,
         "subProduct": sub_product,

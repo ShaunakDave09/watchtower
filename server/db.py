@@ -1,13 +1,14 @@
 import os
 import threading
+from typing import Optional
 
 from databricks.sdk import WorkspaceClient
 import psycopg
 from psycopg_pool import ConnectionPool
 
 _lock = threading.Lock()
-_workspace_client: WorkspaceClient | None = None
-_pool: ConnectionPool | None = None
+_workspace_client: Optional[WorkspaceClient] = None
+_pool: Optional[ConnectionPool] = None
 
 
 def _get_workspace_client() -> WorkspaceClient:
