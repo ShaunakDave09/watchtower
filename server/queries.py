@@ -58,6 +58,11 @@ def _rows_to_steps(rows: list[dict]) -> list[dict]:
     return steps
 
 
+# Wrapping both sides in upper() makes the comparison case-insensitive,
+# which matters here since the same business/product/journey/etc. name can
+# show up with inconsistent casing across rows (e.g. "PERSONALLOAN" in some
+# places, "Personalloan" in others) — an exact `=` would silently drop rows
+# that a human would consider the same value.
 def _dimension_predicates(params: dict) -> list[tuple[str, str]]:
     """Business/product/sub_product/journey/platform/version predicates, as
     (log_name, SQL predicate) pairs — shared by both HORIZONTAL_SUMMARY_TABLE
@@ -71,15 +76,15 @@ def _dimension_predicates(params: dict) -> list[tuple[str, str]]:
     (and never-matching) string comparison.
     """
     predicates = [
-        ("business", '"BUSINESS" = %(business)s'),
-        ("product", '"PRODUCT" = %(product)s'),
-        ("sub_product", '"SUB_PRODUCT" = %(sub_product)s'),
+        ("business", 'upper("BUSINESS") = upper(%(business)s)'),
+        ("product", 'upper("PRODUCT") = upper(%(product)s)'),
+        ("sub_product", 'upper("SUB_PRODUCT") = upper(%(sub_product)s)'),
     ]
     if params.get("journey") != ALL_VALUE:
-        predicates.append(("journey", '"Journey_name" = %(journey)s'))
-    predicates.append(("platform", '"EP_PLATFORM" = %(platform)s'))
+        predicates.append(("journey", 'upper("Journey_name") = upper(%(journey)s)'))
+    predicates.append(("platform", 'upper("EP_PLATFORM") = upper(%(platform)s)'))
     if params.get("version") != ALL_VALUE:
-        predicates.append(("version", '"ENTRYPOINT_STAGE" = %(version)s'))
+        predicates.append(("version", 'upper("ENTRYPOINT_STAGE") = upper(%(version)s)'))
     return predicates
 
 
@@ -93,6 +98,19 @@ def _overview_predicates(params: dict) -> list[tuple[str, str]]:
         *_dimension_predicates(params),
         ("date_range", '"DATE" BETWEEN %(date_from)s AND %(date_to)s'),
     ]
+
+
+def _where_clause(predicates: list[tuple[str, str]]) -> str:
+    """Lay out a WHERE clause's predicates one per line, each "AND" aligned
+    under the first predicate — the same shape you'd hand-write in a SQL
+    client. Predicates are built dynamically (journey/version drop out
+    entirely on ALL_VALUE — see _dimension_predicates), so this is what
+    turns that variable-length list into a query string that's still easy
+    to read top to bottom and copy-paste elsewhere to debug, instead of one
+    long single-line clause.
+    """
+    first, *rest = (sql for _, sql in predicates)
+    return "\n          AND ".join([first, *rest])
 
 
 def _diagnose_empty_overview_result(params: dict) -> None:
@@ -121,13 +139,18 @@ def _diagnose_empty_overview_result(params: dict) -> None:
         pool = db.get_connection()
         with pool.connection() as conn:
             with conn.cursor() as cur:
-                clauses: list[str] = []
+                applied: list[tuple[str, str]] = []
                 for name, predicate in _overview_predicates(params):
-                    clauses.append(predicate)
-                    cur.execute(
-                        f'SELECT COUNT(*) FROM {HORIZONTAL_SUMMARY_TABLE} WHERE {" AND ".join(clauses)}',
-                        params,
-                    )
+                    applied.append((name, predicate))
+
+                    # Query generation
+                    query = f"""
+                        SELECT COUNT(*)
+                        FROM {HORIZONTAL_SUMMARY_TABLE}
+                        WHERE {_where_clause(applied)}
+                    """
+                    cur.execute(query, params)
+
                     count = cur.fetchone()[0]
                     logger.error("  ...after %s=%r: %d matching rows", name, params.get(name), count)
                     if count == 0:
@@ -180,13 +203,18 @@ def fetch_month_options() -> list[str]:
     which ones have data for the current selection — the funnel query itself
     is what surfaces a genuinely empty result for a bad combination.
     """
+    # Query generation
+    query = f"""
+        SELECT DISTINCT "PARTITIONCOL"
+        FROM {MONTHLY_SUMMARY_TABLE}
+        WHERE "PARTITIONCOL" IS NOT NULL
+        ORDER BY "PARTITIONCOL"
+    """
+
     pool = db.get_connection()
     with pool.connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                f'SELECT DISTINCT "PARTITIONCOL" FROM {MONTHLY_SUMMARY_TABLE} '
-                f'WHERE "PARTITIONCOL" IS NOT NULL ORDER BY "PARTITIONCOL"'
-            )
+            cur.execute(query)
             rows = cur.fetchall()
     return [f"{str(row[0])[:4]}-{str(row[0])[4:]}" for row in rows]
 
@@ -218,13 +246,16 @@ def fetch_month_funnel_steps(
         "month": _to_partition_month(month),
     }
     predicates = [*_dimension_predicates(params), ("month", 'CAST("PARTITIONCOL" AS TEXT) = %(month)s')]
+
+    # Query generation
     query = f"""
         SELECT "STAGE_ORDER", "STAGE_NAMES", SUM(users) AS users
         FROM {MONTHLY_SUMMARY_TABLE}
-        WHERE {" AND ".join(predicate for _, predicate in predicates)}
+        WHERE {_where_clause(predicates)}
         GROUP BY "STAGE_ORDER", "STAGE_NAMES"
         ORDER BY "STAGE_ORDER"
     """
+
     pool = db.get_connection()
     with pool.connection() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
@@ -257,10 +288,12 @@ def fetch_overview_funnel_steps(
         "date_to": _to_table_date(date_to),
     }
     predicates = _overview_predicates(params)
+
+    # Query generation
     query = f"""
         SELECT "STAGE_ORDER", "STAGE_NAMES", SUM(users) AS users
         FROM {HORIZONTAL_SUMMARY_TABLE}
-        WHERE {" AND ".join(predicate for _, predicate in predicates)}
+        WHERE {_where_clause(predicates)}
         GROUP BY "STAGE_ORDER", "STAGE_NAMES"
         ORDER BY "STAGE_ORDER"
     """
@@ -392,16 +425,25 @@ def fetch_filter_options(
                     for upstream_key, upstream_column in FILTER_COLUMNS[:i]
                     if selected.get(upstream_key) and selected[upstream_key] != ALL_VALUE
                 ]
-                where_clauses = [f'"{column}" IS NOT NULL']
+                # upper()/upper() for the same reason as _dimension_predicates:
+                # the value the caller selected earlier in the cascade can be
+                # cased differently from the row that's actually in the table.
+                predicates = [f'"{column}" IS NOT NULL']
                 params: dict[str, str] = {}
                 for j, (upstream_column, value) in enumerate(upstream):
                     param_name = f"upstream_{j}"
-                    where_clauses.append(f'"{upstream_column}" = %({param_name})s')
+                    predicates.append(f'upper("{upstream_column}") = upper(%({param_name})s)')
                     params[param_name] = value
-                cur.execute(
-                    f'SELECT DISTINCT "{column}" FROM {HORIZONTAL_SUMMARY_TABLE} '
-                    f'WHERE {" AND ".join(where_clauses)} ORDER BY "{column}"',
-                    params,
-                )
+                where_sql = "\n          AND ".join(predicates)
+
+                # Query generation
+                query = f"""
+                    SELECT DISTINCT "{column}"
+                    FROM {HORIZONTAL_SUMMARY_TABLE}
+                    WHERE {where_sql}
+                    ORDER BY "{column}"
+                """
+                cur.execute(query, params)
+
                 options[key] = [row[0] for row in cur.fetchall()]
     return options
