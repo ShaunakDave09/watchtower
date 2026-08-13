@@ -34,11 +34,23 @@ ALL_VALUE = "All"
 
 
 def _rows_to_steps(rows: list[dict]) -> list[dict]:
+    # SUM() on a bigint column returns Postgres `numeric`, not bigint (that's
+    # how Postgres avoids silently overflowing a running total), so psycopg
+    # hands `row["users"]` back as decimal.Decimal rather than int. Left
+    # alone, that Decimal flows straight through the round()/division below
+    # into the response, where it serializes as a JSON *string* ("100"
+    # instead of 100) — silently breaking the frontend's `users`/`convPct`/
+    # `dropPct: number` fields the moment this runs against a real table
+    # instead of the fixture (whose numbers are already plain JSON numbers).
+    # `users` is a headcount — always a whole number — so int() here is
+    # exact, and it's the one place both fetch_overview_funnel_steps and
+    # fetch_month_funnel_steps funnel through, so every caller gets native
+    # int/float from here on.
     steps = []
-    first_users = rows[0]["users"] if rows else 0
+    first_users = int(rows[0]["users"]) if rows else 0
     prev_users = None
     for i, row in enumerate(rows):
-        users = row["users"]
+        users = int(row["users"])
         conv_pct = round(users / first_users * 100, 1) if first_users else 0.0
         drop_pct = (
             None
