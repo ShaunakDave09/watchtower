@@ -160,23 +160,38 @@ def fetch_overview_funnel_steps(
     return _rows_to_steps(rows)
 
 
-def fetch_funnel_stages(journey_name: str) -> list[dict]:
-    # Funnel Detail doesn't currently carry business/product/subProduct/
-    # platform/version/date filters from the frontend, so this aggregates
-    # across all of them for the given journey.
-    query = f"""
-        SELECT "STAGE_ORDER", "STAGE_NAMES", SUM(users) AS users
-        FROM {HORIZONTAL_SUMMARY_TABLE}
-        WHERE lower("Journey_name") = lower(%(journey_name)s)
-        GROUP BY "STAGE_ORDER", "STAGE_NAMES"
-        ORDER BY "STAGE_ORDER"
+def fetch_funnel_stages(
+    *,
+    business: str,
+    product: str,
+    sub_product: str,
+    journey: str,
+    platform: str,
+    version: str,
+    date_from: str,
+    date_to: str,
+) -> list[dict]:
+    """Funnel Detail's "stages" and Overview's "steps" are the exact same
+    aggregation against the exact same table — full business/product/
+    sub_product/journey/platform/version/date_range predicates, grouped by
+    STAGE_ORDER/STAGE_NAMES — just labeled differently for their respective
+    pages. Funnel Detail used to only filter by journey (see git history),
+    which meant its Filters button/bar showed a full active selection
+    (business, product, platform, dates, ...) that silently had zero effect
+    on the stage breakdown underneath it. Delegating to
+    fetch_overview_funnel_steps keeps both call sites honest against the
+    same query instead of maintaining two copies that could drift apart.
     """
-    pool = db.get_connection()
-    with pool.connection() as conn:
-        with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute(query, {"journey_name": journey_name})
-            rows = cur.fetchall()
-    return _rows_to_steps(rows)
+    return fetch_overview_funnel_steps(
+        business=business,
+        product=product,
+        sub_product=sub_product,
+        journey=journey,
+        platform=platform,
+        version=version,
+        date_from=date_from,
+        date_to=date_to,
+    )
 
 
 # FilterOptions keys (client/src/api/types.ts), in the same order the filter
