@@ -15,6 +15,11 @@ export default function FunnelDetail() {
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    // See the matching guard in Overview.tsx: `to` is deliberately "" while
+    // the calendar is mid-selection (between the start and end date click),
+    // and FiltersContext is shared across the whole app — skip fetching
+    // until it's real instead of sending a blank date param.
+    if (!filters.filters.to) return;
     setError(null);
     fetchFunnelDetail(funnelId ?? "guest-checkout", filters.filters)
       .then(setData)

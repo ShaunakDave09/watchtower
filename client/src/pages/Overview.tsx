@@ -22,6 +22,16 @@ export default function Overview() {
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    // The date-range calendar sets `to` to "" as a deliberate intermediate
+    // state between clicking the start date and clicking the end date (see
+    // useFilters' handleDay/pendingEnd) — FiltersContext is one shared
+    // instance for the whole app, so that intermediate state is visible
+    // here too, not just on whatever page opened the calendar. Skipping the
+    // fetch until `to` is real avoids sending a blank date param the
+    // backend can't run a real query against (it 500s server-side on a
+    // live table and falls back to placeholder fixture data, which looks
+    // exactly like "my real funnel disappeared").
+    if (!filters.filters.to) return;
     setError(null);
     fetchOverview(filters.filters)
       .then(setData)
