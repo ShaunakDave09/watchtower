@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { ALL_FILTER_VALUE } from "../api/types";
 import type { FilterState } from "../api/types";
 
 // Just a starting guess, shown before the real filter options have loaded
@@ -9,12 +10,19 @@ import type { FilterState } from "../api/types";
 // first real option for that field — see the cascade-correction effect
 // there. So these don't need to be "correct" for any particular warehouse,
 // only a reasonable placeholder.
+//
+// journey/version/month default to ALL_FILTER_VALUE rather than a specific
+// guess: unlike business/product/subProduct (which always need one real
+// value to mean anything), these are optional refinements the user picks
+// manually — starting on "All" shows the aggregate across every journey/
+// version/month rather than an arbitrarily-narrowed one.
 const DEFAULTS: FilterState = {
   business: "Payments",
   product: "Checkout",
   subProduct: "Express Pay",
-  journey: "Guest Checkout",
-  version: "v4.1",
+  journey: ALL_FILTER_VALUE,
+  version: ALL_FILTER_VALUE,
+  month: ALL_FILTER_VALUE,
   platform: "App",
   from: "2026-04-01",
   to: "2026-06-30",
@@ -128,6 +136,7 @@ export function useFilters() {
     { cat: "Sub-product", val: filters.subProduct },
     { cat: "Journey", val: filters.journey },
     { cat: "Version", val: filters.version },
+    { cat: "Month", val: filters.month },
     { cat: "Platform", val: filters.platform },
     { cat: "Dates", val: `${fmtShort(filters.from)} – ${filters.to ? fmtShort(filters.to) : "…"}` },
   ];

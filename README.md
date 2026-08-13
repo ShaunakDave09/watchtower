@@ -78,13 +78,23 @@ refreshed automatically before they expire.
 `digital360.horizontal_summary_daily`) is the schema-qualified Postgres name
 of that table — override via env var if you name it differently.
 
+The filter panel's Month field is backed by a second table,
+`MONTHLY_SUMMARY_TABLE` (`server/queries.py`, default
+`digital360.business_funnel_monthly`) — same dimension columns as the daily
+table, but rows are pre-aggregated per calendar month via a `PARTITIONCOL`
+column (`YYYYMM`, e.g. `202608`) instead of a per-day `DATE`. Picking a
+specific month queries this table directly instead of summing the daily
+table over that month's date range, so it needs to exist and be populated
+independently of `HORIZONTAL_SUMMARY_TABLE` for the Month filter to return
+real data — leaving Month on "All" (the default) never touches this table.
+
 ### Known gap
 
 `/api/overview`'s `business`/`product`/`subProduct`/`journey`/`platform`/
-`version`/`from`/`to` query params are all required — if the frontend's date
-picker sends a blank `to` (which happens mid-selection, before the end date
-is clicked), the query will error. Not fixed yet; flagging it since it's a
-real edge case now that the query actually runs.
+`version`/`month`/`from`/`to` query params are all required — if the
+frontend's date picker sends a blank `to` (which happens mid-selection,
+before the end date is clicked), the query will error. Not fixed yet;
+flagging it since it's a real edge case now that the query actually runs.
 
 ## Local development
 

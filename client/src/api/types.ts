@@ -4,13 +4,25 @@ export interface FilterOptions {
   subProduct: string[];
   journey: string[];
   version: string[];
+  // "YYYY-MM" strings, sourced from the monthly summary table rather than
+  // the cascade — see fetchFunnelDetail/fetchOverview's `month` param and
+  // server/queries.py's fetch_month_options.
+  month: string[];
 }
+
+// Sentinel meaning "don't filter on this field" — must match server/queries.py's
+// ALL_VALUE exactly, since it's sent as a literal query param value. Only
+// ever selected for journey/version/month (see useFilters' DEFAULTS): every
+// other field always narrows the data, so it always needs one real pick.
+export const ALL_FILTER_VALUE = "All";
 
 // What's currently picked for the upstream fields in the filter cascade
 // (business -> product -> subProduct -> journey -> version). Passed to
 // fetchFilterOptions so the backend can narrow each field's dropdown to
 // values that actually co-occur with what's already selected above it.
-// `version` never appears here — nothing comes after it to narrow.
+// `version` never appears here — nothing comes after it to narrow. `month`
+// never appears here either — it isn't part of this cascade at all (see
+// FilterOptions.month above).
 export type FilterSelection = Pick<FilterState, "business" | "product" | "subProduct" | "journey">;
 
 export interface FilterState {
@@ -19,6 +31,11 @@ export interface FilterState {
   subProduct: string;
   journey: string;
   version: string;
+  // "YYYY-MM", or ALL_FILTER_VALUE. Picking a real month queries the
+  // monthly summary table directly instead of the daily table's from/to
+  // range — a separate, coarser data path (see server/queries.py's
+  // fetch_funnel_steps).
+  month: string;
   platform: "App" | "Web";
   from: string;
   to: string;

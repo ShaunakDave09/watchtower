@@ -13,6 +13,24 @@ HORIZONTAL_SUMMARY_TABLE = os.environ.get(
     "HORIZONTAL_SUMMARY_TABLE", "digital360.business_funnel_daily"
 )
 
+# Same dimension columns as HORIZONTAL_SUMMARY_TABLE (business, product,
+# sub_product, journey, entrypoint_stage/version, ep_platform), but rows are
+# pre-aggregated per calendar month (PARTITIONCOL, a "YYYYMM" string/int)
+# instead of per day. Backs the Month filter: picking a month queries this
+# table directly rather than summing the daily table over that month's date
+# range — a genuinely separate, coarser data path (see fetch_month_funnel_steps).
+MONTHLY_SUMMARY_TABLE = os.environ.get(
+    "MONTHLY_SUMMARY_TABLE", "digital360.business_funnel_monthly"
+)
+
+# Sentinel for "don't filter on this field" — only offered for Journey and
+# Version. Unlike business/product/sub_product (which narrow which data
+# exists at all and always need a real pick), journey and version are
+# optional refinements: the filter panel defaults to this rather than
+# auto-selecting an arbitrary real journey/version, so the dashboard starts
+# aggregated across all of them until the user picks a specific one.
+ALL_VALUE = "All"
+
 
 def _rows_to_steps(rows: list[dict]) -> list[dict]:
     steps = []
@@ -39,19 +57,41 @@ def _rows_to_steps(rows: list[dict]) -> list[dict]:
     return steps
 
 
-# fetch_overview_funnel_steps's WHERE clause, as (log_name, SQL predicate)
-# pairs in the order they're applied. Used both to build the real query and,
-# on a genuine zero-row result, to work out which single predicate is
-# responsible — see _diagnose_empty_overview_result below.
-_OVERVIEW_PREDICATES: list[tuple[str, str]] = [
-    ("business", '"BUSINESS" = %(business)s'),
-    ("product", '"PRODUCT" = %(product)s'),
-    ("sub_product", '"SUB_PRODUCT" = %(sub_product)s'),
-    ("journey", '"Journey_name" = %(journey)s'),
-    ("platform", '"EP_PLATFORM" = %(platform)s'),
-    ("version", '"ENTRYPOINT_STAGE" = %(version)s'),
-    ("date_range", '"DATE" BETWEEN %(date_from)s AND %(date_to)s'),
-]
+def _dimension_predicates(params: dict) -> list[tuple[str, str]]:
+    """Business/product/sub_product/journey/platform/version predicates, as
+    (log_name, SQL predicate) pairs — shared by both HORIZONTAL_SUMMARY_TABLE
+    and MONTHLY_SUMMARY_TABLE, since both tables carry the same dimension
+    columns. Only the temporal predicate differs between them (DATE range vs.
+    PARTITIONCOL), so each caller appends its own — see _overview_predicates
+    and fetch_month_funnel_steps.
+
+    journey/version are only included when they're not ALL_VALUE — that's
+    what makes "All" mean "don't filter on this field" rather than a literal
+    (and never-matching) string comparison.
+    """
+    predicates = [
+        ("business", '"BUSINESS" = %(business)s'),
+        ("product", '"PRODUCT" = %(product)s'),
+        ("sub_product", '"SUB_PRODUCT" = %(sub_product)s'),
+    ]
+    if params.get("journey") != ALL_VALUE:
+        predicates.append(("journey", '"Journey_name" = %(journey)s'))
+    predicates.append(("platform", '"EP_PLATFORM" = %(platform)s'))
+    if params.get("version") != ALL_VALUE:
+        predicates.append(("version", '"ENTRYPOINT_STAGE" = %(version)s'))
+    return predicates
+
+
+def _overview_predicates(params: dict) -> list[tuple[str, str]]:
+    """fetch_overview_funnel_steps's WHERE clause, as (log_name, SQL
+    predicate) pairs in the order they're applied. Used both to build the
+    real query and, on a genuine zero-row result, to work out which single
+    predicate is responsible — see _diagnose_empty_overview_result below.
+    """
+    return [
+        *_dimension_predicates(params),
+        ("date_range", '"DATE" BETWEEN %(date_from)s AND %(date_to)s'),
+    ]
 
 
 def _diagnose_empty_overview_result(params: dict) -> None:
@@ -81,7 +121,7 @@ def _diagnose_empty_overview_result(params: dict) -> None:
         with pool.connection() as conn:
             with conn.cursor() as cur:
                 clauses: list[str] = []
-                for name, predicate in _OVERVIEW_PREDICATES:
+                for name, predicate in _overview_predicates(params):
                     clauses.append(predicate)
                     cur.execute(
                         f'SELECT COUNT(*) FROM {HORIZONTAL_SUMMARY_TABLE} WHERE {" AND ".join(clauses)}',
@@ -121,6 +161,79 @@ def _to_table_date(iso_date: str) -> str:
     return iso_date.replace("-", "")
 
 
+def _to_partition_month(iso_month: str) -> str:
+    """"YYYY-MM" (what the Month filter and this module's callers deal in)
+    -> PARTITIONCOL's actual "YYYYMM" form (e.g. "2026-08" -> "202608").
+    Mirrors _to_table_date's reasoning for the daily table's DATE column:
+    the conversion happens here, at the one place that builds the SQL,
+    rather than leaking the warehouse's storage format out to the API or UI.
+    """
+    return iso_month.replace("-", "")
+
+
+def fetch_month_options() -> list[str]:
+    """Distinct months with data in MONTHLY_SUMMARY_TABLE, as sorted
+    "YYYY-MM" strings — powers the Month filter's dropdown. Deliberately not
+    narrowed by business/product/subProduct/journey the way fetch_filter_options
+    narrows its fields: this only tells you which months exist *at all*, not
+    which ones have data for the current selection — the funnel query itself
+    is what surfaces a genuinely empty result for a bad combination.
+    """
+    pool = db.get_connection()
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f'SELECT DISTINCT "PARTITIONCOL" FROM {MONTHLY_SUMMARY_TABLE} '
+                f'WHERE "PARTITIONCOL" IS NOT NULL ORDER BY "PARTITIONCOL"'
+            )
+            rows = cur.fetchall()
+    return [f"{str(row[0])[:4]}-{str(row[0])[4:]}" for row in rows]
+
+
+def fetch_month_funnel_steps(
+    *,
+    business: str,
+    product: str,
+    sub_product: str,
+    journey: str,
+    platform: str,
+    version: str,
+    month: str,
+) -> list[dict]:
+    """Same dimension filtering as fetch_overview_funnel_steps, but
+    aggregates MONTHLY_SUMMARY_TABLE's pre-computed monthly rows for a
+    single PARTITIONCOL instead of summing the daily table over a date
+    range. Cast to text on both sides of the PARTITIONCOL comparison since
+    the column's declared type isn't guaranteed (could be integer or text
+    depending on how the gold layer materialized it) — this works either way.
+    """
+    params = {
+        "business": business,
+        "product": product,
+        "sub_product": sub_product,
+        "journey": journey,
+        "platform": platform,
+        "version": version,
+        "month": _to_partition_month(month),
+    }
+    predicates = [*_dimension_predicates(params), ("month", 'CAST("PARTITIONCOL" AS TEXT) = %(month)s')]
+    query = f"""
+        SELECT "STAGE_ORDER", "STAGE_NAMES", SUM(users) AS users
+        FROM {MONTHLY_SUMMARY_TABLE}
+        WHERE {" AND ".join(predicate for _, predicate in predicates)}
+        GROUP BY "STAGE_ORDER", "STAGE_NAMES"
+        ORDER BY "STAGE_ORDER"
+    """
+    pool = db.get_connection()
+    with pool.connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(query, params)
+            rows = cur.fetchall()
+    if not rows:
+        logger.error("fetch_month_funnel_steps matched 0 rows for params=%r", params)
+    return _rows_to_steps(rows)
+
+
 def fetch_overview_funnel_steps(
     *,
     business: str,
@@ -132,13 +245,6 @@ def fetch_overview_funnel_steps(
     date_from: str,
     date_to: str,
 ) -> list[dict]:
-    query = f"""
-        SELECT "STAGE_ORDER", "STAGE_NAMES", SUM(users) AS users
-        FROM {HORIZONTAL_SUMMARY_TABLE}
-        WHERE {" AND ".join(predicate for _, predicate in _OVERVIEW_PREDICATES)}
-        GROUP BY "STAGE_ORDER", "STAGE_NAMES"
-        ORDER BY "STAGE_ORDER"
-    """
     params = {
         "business": business,
         "product": product,
@@ -149,6 +255,14 @@ def fetch_overview_funnel_steps(
         "date_from": _to_table_date(date_from),
         "date_to": _to_table_date(date_to),
     }
+    predicates = _overview_predicates(params)
+    query = f"""
+        SELECT "STAGE_ORDER", "STAGE_NAMES", SUM(users) AS users
+        FROM {HORIZONTAL_SUMMARY_TABLE}
+        WHERE {" AND ".join(predicate for _, predicate in predicates)}
+        GROUP BY "STAGE_ORDER", "STAGE_NAMES"
+        ORDER BY "STAGE_ORDER"
+    """
     pool = db.get_connection()
     with pool.connection() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
@@ -160,7 +274,7 @@ def fetch_overview_funnel_steps(
     return _rows_to_steps(rows)
 
 
-def fetch_funnel_stages(
+def fetch_funnel_steps(
     *,
     business: str,
     product: str,
@@ -168,20 +282,32 @@ def fetch_funnel_stages(
     journey: str,
     platform: str,
     version: str,
+    month: str,
     date_from: str,
     date_to: str,
 ) -> list[dict]:
-    """Funnel Detail's "stages" and Overview's "steps" are the exact same
-    aggregation against the exact same table — full business/product/
-    sub_product/journey/platform/version/date_range predicates, grouped by
-    STAGE_ORDER/STAGE_NAMES — just labeled differently for their respective
-    pages. Funnel Detail used to only filter by journey (see git history),
-    which meant its Filters button/bar showed a full active selection
-    (business, product, platform, dates, ...) that silently had zero effect
-    on the stage breakdown underneath it. Delegating to
-    fetch_overview_funnel_steps keeps both call sites honest against the
-    same query instead of maintaining two copies that could drift apart.
+    """Single entry point for both Overview's funnel chart and Funnel
+    Detail's stage table — they're the exact same aggregation, grouped by
+    STAGE_ORDER/STAGE_NAMES, just labeled differently for their respective
+    pages (Funnel Detail used to only filter by journey; see git history for
+    why that was a bug). This is also where the Month filter takes effect:
+    month == ALL_VALUE (the default) means "no month picked," so it
+    aggregates the daily table over date_from/date_to same as before the
+    Month filter existed; any real month instead queries
+    MONTHLY_SUMMARY_TABLE's pre-aggregated rows for that PARTITIONCOL
+    directly — a coarser, separate data path, not just another way to
+    express the same date range.
     """
+    if month != ALL_VALUE:
+        return fetch_month_funnel_steps(
+            business=business,
+            product=product,
+            sub_product=sub_product,
+            journey=journey,
+            platform=platform,
+            version=version,
+            month=month,
+        )
     return fetch_overview_funnel_steps(
         business=business,
         product=product,
@@ -255,10 +381,15 @@ def fetch_filter_options(
                 # Only the fields *above* this one in the cascade (i.e.
                 # earlier in FILTER_COLUMNS) narrow its options, and only
                 # when the caller actually selected something for them.
+                # "All" (only ever passed for journey — see ALL_VALUE) means
+                # "nothing selected for this field," same as None: it must
+                # not narrow anything downstream, or e.g. picking journey =
+                # "All" would filter version options down to rows literally
+                # matching Journey_name = 'All' (i.e. none).
                 upstream = [
                     (upstream_column, selected[upstream_key])
                     for upstream_key, upstream_column in FILTER_COLUMNS[:i]
-                    if selected.get(upstream_key)
+                    if selected.get(upstream_key) and selected[upstream_key] != ALL_VALUE
                 ]
                 where_clauses = [f'"{column}" IS NOT NULL']
                 params: dict[str, str] = {}
