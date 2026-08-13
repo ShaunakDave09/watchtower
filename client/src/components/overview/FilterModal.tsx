@@ -35,9 +35,6 @@ export default function FilterModal() {
   const { options } = filters;
   if (!filters.open || !options) return null;
 
-  const segBase =
-    "flex-1 rounded-[7px] border-0 py-2 text-center text-[12.5px] font-medium transition-colors";
-
   return (
     <div
       onClick={() => filters.setOpen(false)}
@@ -75,25 +72,7 @@ export default function FilterModal() {
           <FieldSelect label="JOURNEY" value={filters.filters.journey} options={options.journey} onChange={(v) => filters.set("journey", v)} />
           <FieldSelect label="VERSION" value={filters.filters.version} options={options.version} onChange={(v) => filters.set("version", v)} />
           <FieldSelect label="MONTH" value={filters.filters.month} options={options.month} onChange={(v) => filters.set("month", v)} />
-          <div>
-            <span className="mb-[5px] block font-mono text-[10px] tracking-[0.05em] text-[var(--color-muted)]">
-              PLATFORM
-            </span>
-            <div className="flex gap-1 rounded-[9px] border border-[var(--color-border-strong)] bg-[var(--color-accent-chip)] p-[3px]">
-              <button
-                onClick={() => filters.set("platform", "App")}
-                className={`${segBase} ${filters.filters.platform === "App" ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-body)]"}`}
-              >
-                App
-              </button>
-              <button
-                onClick={() => filters.set("platform", "Web")}
-                className={`${segBase} ${filters.filters.platform === "Web" ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-body)]"}`}
-              >
-                Web
-              </button>
-            </div>
-          </div>
+          <FieldSelect label="PLATFORM" value={filters.filters.platform} options={options.platform} onChange={(v) => filters.set("platform", v)} />
 
           <div className="col-span-3">
             <span className="mb-[5px] block font-mono text-[10px] tracking-[0.05em] text-[var(--color-muted)]">

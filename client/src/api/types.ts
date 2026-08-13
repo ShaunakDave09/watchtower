@@ -4,6 +4,9 @@ export interface FilterOptions {
   subProduct: string[];
   journey: string[];
   version: string[];
+  // Real distinct EP_PLATFORM values, same cascade as business/product/etc
+  // (see server/queries.py's FILTER_COLUMNS) — not a hardcoded App/Web pair.
+  platform: string[];
   // "YYYY-MM" strings, sourced from the monthly summary table rather than
   // the cascade — see fetchFunnelDetail/fetchOverview's `month` param and
   // server/queries.py's fetch_month_options.
@@ -12,18 +15,19 @@ export interface FilterOptions {
 
 // Sentinel meaning "don't filter on this field" — must match server/queries.py's
 // ALL_VALUE exactly, since it's sent as a literal query param value. Only
-// ever selected for journey/version/month (see useFilters' DEFAULTS): every
-// other field always narrows the data, so it always needs one real pick.
+// ever selected for journey/version/platform/month (see useFilters'
+// DEFAULTS): business/product/subProduct always narrow the data, so they
+// always need one real pick.
 export const ALL_FILTER_VALUE = "All";
 
 // What's currently picked for the upstream fields in the filter cascade
-// (business -> product -> subProduct -> journey -> version). Passed to
-// fetchFilterOptions so the backend can narrow each field's dropdown to
-// values that actually co-occur with what's already selected above it.
-// `version` never appears here — nothing comes after it to narrow. `month`
-// never appears here either — it isn't part of this cascade at all (see
-// FilterOptions.month above).
-export type FilterSelection = Pick<FilterState, "business" | "product" | "subProduct" | "journey">;
+// (business -> product -> subProduct -> journey -> version -> platform).
+// Passed to fetchFilterOptions so the backend can narrow each field's
+// dropdown to values that actually co-occur with what's already selected
+// above it. `platform` never appears here — nothing comes after it to
+// narrow. `month` never appears here either — it isn't part of this cascade
+// at all (see FilterOptions.month above).
+export type FilterSelection = Pick<FilterState, "business" | "product" | "subProduct" | "journey" | "version">;
 
 export interface FilterState {
   business: string;
@@ -36,7 +40,9 @@ export interface FilterState {
   // range — a separate, coarser data path (see server/queries.py's
   // fetch_funnel_steps).
   month: string;
-  platform: "App" | "Web";
+  // Real EP_PLATFORM value, or ALL_FILTER_VALUE — same cascade as journey/
+  // version, not a hardcoded "App"/"Web" pair (see FilterOptions.platform).
+  platform: string;
   from: string;
   to: string;
 }
