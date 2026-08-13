@@ -6,6 +6,12 @@ export interface FilterOptions {
   version: string[];
 }
 
+// Sentinel meaning "don't filter on this field" — must match server/queries.py's
+// ALL_VALUE exactly, since it's sent as a literal query param value. Only
+// ever selected for journey/version (see useFilters' DEFAULTS): every other
+// field always narrows the data, so it always needs one real pick.
+export const ALL_FILTER_VALUE = "All";
+
 // What's currently picked for the upstream fields in the filter cascade
 // (business -> product -> subProduct -> journey -> version). Passed to
 // fetchFilterOptions so the backend can narrow each field's dropdown to

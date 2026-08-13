@@ -13,6 +13,14 @@ HORIZONTAL_SUMMARY_TABLE = os.environ.get(
     "HORIZONTAL_SUMMARY_TABLE", "digital360.business_funnel_daily"
 )
 
+# Sentinel for "don't filter on this field" — only offered for Journey and
+# Version. Unlike business/product/sub_product (which narrow which data
+# exists at all and always need a real pick), journey and version are
+# optional refinements: the filter panel defaults to this rather than
+# auto-selecting an arbitrary real journey/version, so the dashboard starts
+# aggregated across all of them until the user picks a specific one.
+ALL_VALUE = "All"
+
 
 def _rows_to_steps(rows: list[dict]) -> list[dict]:
     steps = []
@@ -39,19 +47,28 @@ def _rows_to_steps(rows: list[dict]) -> list[dict]:
     return steps
 
 
-# fetch_overview_funnel_steps's WHERE clause, as (log_name, SQL predicate)
-# pairs in the order they're applied. Used both to build the real query and,
-# on a genuine zero-row result, to work out which single predicate is
-# responsible — see _diagnose_empty_overview_result below.
-_OVERVIEW_PREDICATES: list[tuple[str, str]] = [
-    ("business", '"BUSINESS" = %(business)s'),
-    ("product", '"PRODUCT" = %(product)s'),
-    ("sub_product", '"SUB_PRODUCT" = %(sub_product)s'),
-    ("journey", '"Journey_name" = %(journey)s'),
-    ("platform", '"EP_PLATFORM" = %(platform)s'),
-    ("version", '"ENTRYPOINT_STAGE" = %(version)s'),
-    ("date_range", '"DATE" BETWEEN %(date_from)s AND %(date_to)s'),
-]
+def _overview_predicates(params: dict) -> list[tuple[str, str]]:
+    """fetch_overview_funnel_steps's WHERE clause, as (log_name, SQL
+    predicate) pairs in the order they're applied. Used both to build the
+    real query and, on a genuine zero-row result, to work out which single
+    predicate is responsible — see _diagnose_empty_overview_result below.
+
+    journey/version are only included when they're not ALL_VALUE — that's
+    what makes "All" mean "don't filter on this field" rather than a literal
+    (and never-matching) string comparison.
+    """
+    predicates = [
+        ("business", '"BUSINESS" = %(business)s'),
+        ("product", '"PRODUCT" = %(product)s'),
+        ("sub_product", '"SUB_PRODUCT" = %(sub_product)s'),
+    ]
+    if params.get("journey") != ALL_VALUE:
+        predicates.append(("journey", '"Journey_name" = %(journey)s'))
+    predicates.append(("platform", '"EP_PLATFORM" = %(platform)s'))
+    if params.get("version") != ALL_VALUE:
+        predicates.append(("version", '"ENTRYPOINT_STAGE" = %(version)s'))
+    predicates.append(("date_range", '"DATE" BETWEEN %(date_from)s AND %(date_to)s'))
+    return predicates
 
 
 def _diagnose_empty_overview_result(params: dict) -> None:
@@ -81,7 +98,7 @@ def _diagnose_empty_overview_result(params: dict) -> None:
         with pool.connection() as conn:
             with conn.cursor() as cur:
                 clauses: list[str] = []
-                for name, predicate in _OVERVIEW_PREDICATES:
+                for name, predicate in _overview_predicates(params):
                     clauses.append(predicate)
                     cur.execute(
                         f'SELECT COUNT(*) FROM {HORIZONTAL_SUMMARY_TABLE} WHERE {" AND ".join(clauses)}',
@@ -132,13 +149,6 @@ def fetch_overview_funnel_steps(
     date_from: str,
     date_to: str,
 ) -> list[dict]:
-    query = f"""
-        SELECT "STAGE_ORDER", "STAGE_NAMES", SUM(users) AS users
-        FROM {HORIZONTAL_SUMMARY_TABLE}
-        WHERE {" AND ".join(predicate for _, predicate in _OVERVIEW_PREDICATES)}
-        GROUP BY "STAGE_ORDER", "STAGE_NAMES"
-        ORDER BY "STAGE_ORDER"
-    """
     params = {
         "business": business,
         "product": product,
@@ -149,6 +159,14 @@ def fetch_overview_funnel_steps(
         "date_from": _to_table_date(date_from),
         "date_to": _to_table_date(date_to),
     }
+    predicates = _overview_predicates(params)
+    query = f"""
+        SELECT "STAGE_ORDER", "STAGE_NAMES", SUM(users) AS users
+        FROM {HORIZONTAL_SUMMARY_TABLE}
+        WHERE {" AND ".join(predicate for _, predicate in predicates)}
+        GROUP BY "STAGE_ORDER", "STAGE_NAMES"
+        ORDER BY "STAGE_ORDER"
+    """
     pool = db.get_connection()
     with pool.connection() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
@@ -255,10 +273,15 @@ def fetch_filter_options(
                 # Only the fields *above* this one in the cascade (i.e.
                 # earlier in FILTER_COLUMNS) narrow its options, and only
                 # when the caller actually selected something for them.
+                # "All" (only ever passed for journey — see ALL_VALUE) means
+                # "nothing selected for this field," same as None: it must
+                # not narrow anything downstream, or e.g. picking journey =
+                # "All" would filter version options down to rows literally
+                # matching Journey_name = 'All' (i.e. none).
                 upstream = [
                     (upstream_column, selected[upstream_key])
                     for upstream_key, upstream_column in FILTER_COLUMNS[:i]
-                    if selected.get(upstream_key)
+                    if selected.get(upstream_key) and selected[upstream_key] != ALL_VALUE
                 ]
                 where_clauses = [f'"{column}" IS NOT NULL']
                 params: dict[str, str] = {}

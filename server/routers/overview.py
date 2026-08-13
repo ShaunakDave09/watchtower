@@ -26,7 +26,7 @@ def get_filters(
     journey: str | None = Query(None),
 ) -> dict:
     try:
-        return queries.fetch_filter_options(
+        options = queries.fetch_filter_options(
             business=business, product=product, sub_product=sub_product, journey=journey
         )
     except Exception:
@@ -37,7 +37,22 @@ def get_filters(
         # only has two products) — not something to paper over with the
         # unfiltered fixture, which would silently break the cascade.
         logger.exception("fetch_filter_options failed, falling back to fixture filters")
-        return json.loads((FIXTURES_DIR / "filters.json").read_text())
+        options = json.loads((FIXTURES_DIR / "filters.json").read_text())
+    return _with_all_option(options)
+
+
+# Journey and Version are the only two fields the filter panel lets you
+# leave unset (see queries.ALL_VALUE) — every other field always narrows the
+# data, so it always needs one real pick. Adding "All" here, right before
+# the response goes out, means the dropdown offers it regardless of whether
+# the options came from the live query or the fixture fallback above,
+# without either of those needing to know about UI presentation.
+def _with_all_option(options: dict) -> dict:
+    return {
+        **options,
+        "journey": [queries.ALL_VALUE, *options["journey"]],
+        "version": [queries.ALL_VALUE, *options["version"]],
+    }
 
 
 @router.get("/overview")
