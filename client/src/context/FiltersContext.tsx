@@ -11,14 +11,22 @@ interface FiltersContextValue extends UseFiltersReturn {
 
 const FiltersContext = createContext<FiltersContextValue | null>(null);
 
-// Cascade order: business -> product -> subProduct -> journey -> version.
-// Each field's real options only make sense given whatever's picked above
-// it, so this is also the order we check for (and correct) an invalid
-// selection in — see the effect below. `month` is appended even though it
-// isn't part of this cascade (nothing narrows it, and it narrows nothing
-// downstream) purely so a stale/removed month selection still gets snapped
-// back to a real option whenever this correction pass happens to run.
-const CASCADE_KEYS: (keyof FilterOptions)[] = ["business", "product", "subProduct", "journey", "version", "month"];
+// Cascade order: business -> product -> subProduct -> journey -> version ->
+// platform. Each field's real options only make sense given whatever's
+// picked above it, so this is also the order we check for (and correct) an
+// invalid selection in — see the effect below. `month` is appended even
+// though it isn't part of this cascade (nothing narrows it, and it narrows
+// nothing downstream) purely so a stale/removed month selection still gets
+// snapped back to a real option whenever this correction pass happens to run.
+const CASCADE_KEYS: (keyof FilterOptions)[] = [
+  "business",
+  "product",
+  "subProduct",
+  "journey",
+  "version",
+  "platform",
+  "month",
+];
 
 export function FiltersProvider({ children }: { children: ReactNode }) {
   const filters = useFilters();
@@ -36,6 +44,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
       product: filters.filters.product,
       subProduct: filters.filters.subProduct,
       journey: filters.filters.journey,
+      version: filters.filters.version,
     }).then((opts) => {
       setOptions(opts);
 
@@ -68,12 +77,20 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
         }
       }
     });
-    // Only the four fields that actually drive the cascade belong here.
-    // `filters.set` and `filters.filters` (whole object) are intentionally
-    // excluded — including them would refetch on every keystroke-equivalent
-    // change (platform, date range) that the cascade doesn't care about.
+    // Only the fields that actually drive the cascade belong here — version
+    // joined business/product/subProduct/journey once platform started
+    // being narrowed by it (see FILTER_COLUMNS). `filters.set` and
+    // `filters.filters` (whole object) are intentionally excluded —
+    // including them would refetch on every keystroke-equivalent change
+    // (platform, date range) that the cascade doesn't care about.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.filters.business, filters.filters.product, filters.filters.subProduct, filters.filters.journey]);
+  }, [
+    filters.filters.business,
+    filters.filters.product,
+    filters.filters.subProduct,
+    filters.filters.journey,
+    filters.filters.version,
+  ]);
 
   return <FiltersContext.Provider value={{ ...filters, options }}>{children}</FiltersContext.Provider>;
 }

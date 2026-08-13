@@ -25,10 +25,11 @@ def get_filters(
     product: Optional[str] = Query(None),
     sub_product: Optional[str] = Query(None, alias="subProduct"),
     journey: Optional[str] = Query(None),
+    version: Optional[str] = Query(None),
 ) -> dict:
     try:
         options = queries.fetch_filter_options(
-            business=business, product=product, sub_product=sub_product, journey=journey
+            business=business, product=product, sub_product=sub_product, journey=journey, version=version
         )
     except Exception:
         # Only a genuine failure to run the query (DB unreachable, bad
@@ -50,17 +51,19 @@ def get_filters(
     return _with_all_option(options)
 
 
-# Journey, Version, and Month are the only fields the filter panel lets you
-# leave unset (see queries.ALL_VALUE) — every other field always narrows the
-# data, so it always needs one real pick. Adding "All" here, right before
-# the response goes out, means the dropdown offers it regardless of whether
-# the options came from the live query(ies) or a fixture fallback above,
-# without either of those needing to know about UI presentation.
+# Journey, Version, Platform, and Month are the only fields the filter panel
+# lets you leave unset (see queries.ALL_VALUE) — every other field always
+# narrows the data, so it always needs one real pick. Adding "All" here,
+# right before the response goes out, means the dropdown offers it
+# regardless of whether the options came from the live query(ies) or a
+# fixture fallback above, without either of those needing to know about UI
+# presentation.
 def _with_all_option(options: dict) -> dict:
     return {
         **options,
         "journey": [queries.ALL_VALUE, *options["journey"]],
         "version": [queries.ALL_VALUE, *options["version"]],
+        "platform": [queries.ALL_VALUE, *options["platform"]],
         "month": [queries.ALL_VALUE, *options["month"]],
     }
 
