@@ -18,20 +18,18 @@ async function getJson<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-// `selection` is whatever's currently picked for business/product/
-// subProduct/journey/version (all optional — pass what you have). The
-// backend uses it to narrow every field *below* the deepest one supplied,
-// so e.g. passing just `{ business }` comes back with product/subProduct/
-// journey/version/platform options scoped to that business. Omit it
-// entirely for the unfiltered, top-level lists (what the modal shows before
-// anything's been picked).
+// `selection` is whatever's currently picked for business/product/subProduct
+// /journey (all optional — pass what you have). The backend uses it to
+// narrow every field *below* the deepest one supplied, so e.g. passing just
+// `{ business }` comes back with product/subProduct/journey/version options
+// scoped to that business. Omit it entirely for the unfiltered, top-level
+// lists (what the modal shows before anything's been picked).
 export function fetchFilterOptions(selection?: Partial<FilterSelection>): Promise<FilterOptions> {
   const params = new URLSearchParams();
   if (selection?.business) params.set("business", selection.business);
   if (selection?.product) params.set("product", selection.product);
   if (selection?.subProduct) params.set("subProduct", selection.subProduct);
   if (selection?.journey) params.set("journey", selection.journey);
-  if (selection?.version) params.set("version", selection.version);
   const qs = params.toString();
   return getJson(`/api/filters${qs ? `?${qs}` : ""}`);
 }

@@ -91,23 +91,10 @@ real data — leaving Month on "All" (the default) never touches this table.
 ### Known gap
 
 `/api/overview`'s `business`/`product`/`subProduct`/`journey`/`platform`/
-`version`/`month`/`from`/`to` query params are all required, and the daily
-table's `DATE` column rejects anything that doesn't parse as its real type
-(observed as Postgres `bigint`) — a blank `to` throws
-`InvalidTextRepresentation`, not a 0-row result. That's caught server-side
-and falls back to the static fixture funnel, so it doesn't 500, but a blank
-`to` briefly replacing real data with placeholder numbers reads exactly like
-"my funnel disappeared."
-
-The frontend's date-range calendar sets `to` to `""` as a deliberate
-intermediate state between clicking the start and end date (see
-`useFilters`' `handleDay`/`pendingEnd`), and `FiltersContext` is one shared
-instance for the whole app, so that intermediate state briefly reaches
-whichever page happens to be mounted. `Overview.tsx` and `FunnelDetail.tsx`
-both skip fetching while `to` is blank instead of sending it, so this
-doesn't happen in normal use through the UI — but the backend still has no
-validation of its own for a caller that sends a blank date directly (only
-the try/except fallback above), which is the part that's "not fixed yet."
+`version`/`month`/`from`/`to` query params are all required — if the
+frontend's date picker sends a blank `to` (which happens mid-selection,
+before the end date is clicked), the query will error. Not fixed yet;
+flagging it since it's a real edge case now that the query actually runs.
 
 ## Local development
 

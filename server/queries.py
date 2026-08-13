@@ -34,23 +34,11 @@ ALL_VALUE = "All"
 
 
 def _rows_to_steps(rows: list[dict]) -> list[dict]:
-    # SUM() on a bigint column returns Postgres `numeric`, not bigint (that's
-    # how Postgres avoids silently overflowing a running total), so psycopg
-    # hands `row["users"]` back as decimal.Decimal rather than int. Left
-    # alone, that Decimal flows straight through the round()/division below
-    # into the response, where it serializes as a JSON *string* ("100"
-    # instead of 100) — silently breaking the frontend's `users`/`convPct`/
-    # `dropPct: number` fields the moment this runs against a real table
-    # instead of the fixture (whose numbers are already plain JSON numbers).
-    # `users` is a headcount — always a whole number — so int() here is
-    # exact, and it's the one place both fetch_overview_funnel_steps and
-    # fetch_month_funnel_steps funnel through, so every caller gets native
-    # int/float from here on.
     steps = []
-    first_users = int(rows[0]["users"]) if rows else 0
+    first_users = rows[0]["users"] if rows else 0
     prev_users = None
     for i, row in enumerate(rows):
-        users = int(row["users"])
+        users = row["users"]
         conv_pct = round(users / first_users * 100, 1) if first_users else 0.0
         drop_pct = (
             None
@@ -70,11 +58,6 @@ def _rows_to_steps(rows: list[dict]) -> list[dict]:
     return steps
 
 
-# Wrapping both sides in upper() makes the comparison case-insensitive,
-# which matters here since the same business/product/journey/etc. name can
-# show up with inconsistent casing across rows (e.g. "PERSONALLOAN" in some
-# places, "Personalloan" in others) — an exact `=` would silently drop rows
-# that a human would consider the same value.
 def _dimension_predicates(params: dict) -> list[tuple[str, str]]:
     """Business/product/sub_product/journey/platform/version predicates, as
     (log_name, SQL predicate) pairs — shared by both HORIZONTAL_SUMMARY_TABLE
@@ -83,27 +66,20 @@ def _dimension_predicates(params: dict) -> list[tuple[str, str]]:
     PARTITIONCOL), so each caller appends its own — see _overview_predicates
     and fetch_month_funnel_steps.
 
-    journey/version/platform are only included when they're not ALL_VALUE —
-    that's what makes "All" mean "don't filter on this field" rather than a
-    literal (and never-matching) string comparison. platform used to always
-    be included, hardcoded to the frontend's fixed "App"/"Web" toggle — a
-    real EP_PLATFORM value that isn't literally one of those two strings
-    (case aside) could never match, with no way to select it in the UI at
-    all. It's now sourced from the real column same as every other field
-    (see FILTER_COLUMNS) and defaults to "All" the same way journey/version
-    do.
+    journey/version are only included when they're not ALL_VALUE — that's
+    what makes "All" mean "don't filter on this field" rather than a literal
+    (and never-matching) string comparison.
     """
     predicates = [
-        ("business", 'upper("BUSINESS") = upper(%(business)s)'),
-        ("product", 'upper("PRODUCT") = upper(%(product)s)'),
-        ("sub_product", 'upper("SUB_PRODUCT") = upper(%(sub_product)s)'),
+        ("business", '"BUSINESS" = %(business)s'),
+        ("product", '"PRODUCT" = %(product)s'),
+        ("sub_product", '"SUB_PRODUCT" = %(sub_product)s'),
     ]
     if params.get("journey") != ALL_VALUE:
-        predicates.append(("journey", 'upper("Journey_name") = upper(%(journey)s)'))
-    if params.get("platform") != ALL_VALUE:
-        predicates.append(("platform", 'upper("EP_PLATFORM") = upper(%(platform)s)'))
+        predicates.append(("journey", '"Journey_name" = %(journey)s'))
+    predicates.append(("platform", '"EP_PLATFORM" = %(platform)s'))
     if params.get("version") != ALL_VALUE:
-        predicates.append(("version", 'upper("ENTRYPOINT_STAGE") = upper(%(version)s)'))
+        predicates.append(("version", '"ENTRYPOINT_STAGE" = %(version)s'))
     return predicates
 
 
@@ -119,35 +95,20 @@ def _overview_predicates(params: dict) -> list[tuple[str, str]]:
     ]
 
 
-def _where_clause(predicates: list[tuple[str, str]]) -> str:
-    """Lay out a WHERE clause's predicates one per line, each "AND" aligned
-    under the first predicate — the same shape you'd hand-write in a SQL
-    client. Predicates are built dynamically (journey/version drop out
-    entirely on ALL_VALUE — see _dimension_predicates), so this is what
-    turns that variable-length list into a query string that's still easy
-    to read top to bottom and copy-paste elsewhere to debug, instead of one
-    long single-line clause.
-    """
-    first, *rest = (sql for _, sql in predicates)
-    return "\n          AND ".join([first, *rest])
+def _diagnose_empty_overview_result(params: dict) -> None:
+    """Best-effort: fetch_overview_funnel_steps matched zero rows for this
+    exact combination — figure out *which* predicate is responsible instead
+    of leaving it a mystery.
 
-
-def _diagnose_empty_result(caller: str, table: str, predicates: list[tuple[str, str]], params: dict) -> None:
-    """Best-effort: `caller` matched zero rows for this exact combination —
-    figure out *which* predicate is responsible instead of leaving it a
-    mystery. Shared by fetch_overview_funnel_steps (HORIZONTAL_SUMMARY_TABLE)
-    and fetch_month_funnel_steps (MONTHLY_SUMMARY_TABLE) — same diagnostic,
-    just pointed at whichever table/predicate list the caller actually used.
-
-    date_range (daily table only) is the one predicate not covered by
-    fetch_filter_options's cascade: it starts from a hardcoded default
-    rather than the table's actual DATE span, so a mismatch there is
-    invisible to the dropdowns — everything can look like a valid, cascaded
-    selection and still match zero rows purely because the date window
-    doesn't overlap any real data. Every other predicate (business/product/
-    sub_product/journey/platform/version) *is* covered by the cascade, so if
-    one of those is the culprit instead, something upstream let an invalid
-    combination through.
+    Two of the seven predicates above (platform, date_range) aren't covered
+    by fetch_filter_options's cascade: `platform` comes from a hardcoded
+    App/Web toggle in the frontend rather than real EP_PLATFORM values, and
+    the date range starts from a hardcoded default rather than the table's
+    actual DATE span. So a mismatch there is invisible to the dropdowns —
+    everything can look like a valid, cascaded selection and still match
+    zero rows. business/product/sub_product/journey/version *are* covered
+    by the cascade, so if one of those is the culprit instead, something
+    upstream let an invalid combination through.
 
     Re-runs the query, adding one predicate at a time in the same order
     it's applied, and logs the row count after each addition — the first
@@ -160,25 +121,19 @@ def _diagnose_empty_result(caller: str, table: str, predicates: list[tuple[str, 
         pool = db.get_connection()
         with pool.connection() as conn:
             with conn.cursor() as cur:
-                applied: list[tuple[str, str]] = []
-                for name, predicate in predicates:
-                    applied.append((name, predicate))
-
-                    # Query generation
-                    query = f"""
-                        SELECT COUNT(*)
-                        FROM {table}
-                        WHERE {_where_clause(applied)}
-                    """
-                    cur.execute(query, params)
-
+                clauses: list[str] = []
+                for name, predicate in _overview_predicates(params):
+                    clauses.append(predicate)
+                    cur.execute(
+                        f'SELECT COUNT(*) FROM {HORIZONTAL_SUMMARY_TABLE} WHERE {" AND ".join(clauses)}',
+                        params,
+                    )
                     count = cur.fetchone()[0]
                     logger.error("  ...after %s=%r: %d matching rows", name, params.get(name), count)
                     if count == 0:
                         logger.error(
-                            "%s: %r eliminated every remaining row — "
+                            "fetch_overview_funnel_steps: %r eliminated every remaining row — "
                             "this is almost certainly why the funnel shows no data for this selection",
-                            caller,
                             name,
                         )
                         return
@@ -225,18 +180,13 @@ def fetch_month_options() -> list[str]:
     which ones have data for the current selection — the funnel query itself
     is what surfaces a genuinely empty result for a bad combination.
     """
-    # Query generation
-    query = f"""
-        SELECT DISTINCT "PARTITIONCOL"
-        FROM {MONTHLY_SUMMARY_TABLE}
-        WHERE "PARTITIONCOL" IS NOT NULL
-        ORDER BY "PARTITIONCOL"
-    """
-
     pool = db.get_connection()
     with pool.connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(query)
+            cur.execute(
+                f'SELECT DISTINCT "PARTITIONCOL" FROM {MONTHLY_SUMMARY_TABLE} '
+                f'WHERE "PARTITIONCOL" IS NOT NULL ORDER BY "PARTITIONCOL"'
+            )
             rows = cur.fetchall()
     return [f"{str(row[0])[:4]}-{str(row[0])[4:]}" for row in rows]
 
@@ -268,16 +218,13 @@ def fetch_month_funnel_steps(
         "month": _to_partition_month(month),
     }
     predicates = [*_dimension_predicates(params), ("month", 'CAST("PARTITIONCOL" AS TEXT) = %(month)s')]
-
-    # Query generation
     query = f"""
         SELECT "STAGE_ORDER", "STAGE_NAMES", SUM(users) AS users
         FROM {MONTHLY_SUMMARY_TABLE}
-        WHERE {_where_clause(predicates)}
+        WHERE {" AND ".join(predicate for _, predicate in predicates)}
         GROUP BY "STAGE_ORDER", "STAGE_NAMES"
         ORDER BY "STAGE_ORDER"
     """
-
     pool = db.get_connection()
     with pool.connection() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
@@ -285,7 +232,6 @@ def fetch_month_funnel_steps(
             rows = cur.fetchall()
     if not rows:
         logger.error("fetch_month_funnel_steps matched 0 rows for params=%r", params)
-        _diagnose_empty_result("fetch_month_funnel_steps", MONTHLY_SUMMARY_TABLE, predicates, params)
     return _rows_to_steps(rows)
 
 
@@ -311,12 +257,10 @@ def fetch_overview_funnel_steps(
         "date_to": _to_table_date(date_to),
     }
     predicates = _overview_predicates(params)
-
-    # Query generation
     query = f"""
         SELECT "STAGE_ORDER", "STAGE_NAMES", SUM(users) AS users
         FROM {HORIZONTAL_SUMMARY_TABLE}
-        WHERE {_where_clause(predicates)}
+        WHERE {" AND ".join(predicate for _, predicate in predicates)}
         GROUP BY "STAGE_ORDER", "STAGE_NAMES"
         ORDER BY "STAGE_ORDER"
     """
@@ -327,7 +271,7 @@ def fetch_overview_funnel_steps(
             rows = cur.fetchall()
     if not rows:
         logger.error("fetch_overview_funnel_steps matched 0 rows for params=%r", params)
-        _diagnose_empty_result("fetch_overview_funnel_steps", HORIZONTAL_SUMMARY_TABLE, predicates, params)
+        _diagnose_empty_overview_result(params)
     return _rows_to_steps(rows)
 
 
@@ -378,27 +322,19 @@ def fetch_funnel_steps(
 
 
 # FilterOptions keys (client/src/api/types.ts), in the same order the filter
-# modal shows them: BUSINESS -> PRODUCT -> SUB-PRODUCT -> JOURNEY -> VERSION
-# -> PLATFORM. That order is also the *cascade* hierarchy: each field's
-# dropdown should only offer values that actually co-occur with whatever was
-# picked for the fields above it (picking BUSINESS="Retail" should narrow
-# PRODUCT down to products that exist under Retail, and so on).
-# FILTER_COLUMNS pairs each key with its quoted column name in
-# HORIZONTAL_SUMMARY_TABLE, in that same cascade order.
-#
-# platform belongs here for the same reason journey/version do: it needs a
-# real pick from real data. It used to be a hardcoded frontend App/Web
-# toggle sent as a literal EP_PLATFORM comparison — if the real column never
-# held those exact two strings, there was no way to select the right value
-# in the UI at all, and every query would legitimately (if confusingly)
-# match zero rows regardless of what else was selected.
+# modal shows them: BUSINESS -> PRODUCT -> SUB-PRODUCT -> JOURNEY -> VERSION.
+# That order is also the *cascade* hierarchy: each field's dropdown should
+# only offer values that actually co-occur with whatever was picked for the
+# fields above it (picking BUSINESS="Retail" should narrow PRODUCT down to
+# products that exist under Retail, and so on). FILTER_COLUMNS pairs each
+# key with its quoted column name in HORIZONTAL_SUMMARY_TABLE, in that same
+# cascade order.
 FILTER_COLUMNS: list[tuple[str, str]] = [
     ("business", "BUSINESS"),
     ("product", "PRODUCT"),
     ("subProduct", "SUB_PRODUCT"),
     ("journey", "Journey_name"),
     ("version", "ENTRYPOINT_STAGE"),
-    ("platform", "EP_PLATFORM"),
 ]
 
 
@@ -408,22 +344,20 @@ def fetch_filter_options(
     product: Optional[str] = None,
     sub_product: Optional[str] = None,
     journey: Optional[str] = None,
-    version: Optional[str] = None,
 ) -> dict:
     """Distinct, non-null values for each filter dropdown, straight from the
     warehouse — optionally narrowed by whatever the caller already has
     selected upstream in the cascade.
 
-    `business`/`product`/`sub_product`/`journey`/`version` are the *currently
-    selected* values for those fields (or None if nothing's selected yet).
-    Each of them constrains every column that comes after it in
-    FILTER_COLUMNS: e.g. passing business="Retail" narrows the product,
-    sub-product, journey, version, and platform lists to rows where
-    BUSINESS = 'Retail', but the business list itself stays unfiltered (it's
-    the top of the hierarchy, nothing narrows it). This mirrors how a human
-    would explore the data top-down, and it's exactly what the frontend
-    needs to keep the dropdowns from ever showing a combination that
-    doesn't actually exist together.
+    `business`/`product`/`sub_product`/`journey` are the *currently selected*
+    values for those fields (or None if nothing's selected yet). Each of
+    them constrains every column that comes after it in FILTER_COLUMNS: e.g.
+    passing business="Retail" narrows the product, sub-product, journey, and
+    version lists to rows where BUSINESS = 'Retail', but the business list
+    itself stays unfiltered (it's the top of the hierarchy, nothing narrows
+    it). This mirrors how a human would explore the data top-down, and it's
+    exactly what the frontend needs to keep the dropdowns from ever showing
+    a combination that doesn't actually exist together.
 
     Shape of the return value matches FilterOptions exactly, so the router
     can return this (or the fixture) with no frontend changes either way.
@@ -436,8 +370,7 @@ def fetch_filter_options(
         "product": product,
         "subProduct": sub_product,
         "journey": journey,
-        "version": version,
-        # "platform" has nothing after it to narrow, so it's never a filter
+        # "version" has nothing after it to narrow, so it's never a filter
         # input here — only an output.
     }
 
@@ -449,35 +382,26 @@ def fetch_filter_options(
                 # Only the fields *above* this one in the cascade (i.e.
                 # earlier in FILTER_COLUMNS) narrow its options, and only
                 # when the caller actually selected something for them.
-                # "All" (see ALL_VALUE — journey/version/platform can all be
-                # it) means "nothing selected for this field," same as None:
-                # it must not narrow anything downstream, or e.g. picking
-                # journey = "All" would filter version options down to rows
-                # literally matching Journey_name = 'All' (i.e. none).
+                # "All" (only ever passed for journey — see ALL_VALUE) means
+                # "nothing selected for this field," same as None: it must
+                # not narrow anything downstream, or e.g. picking journey =
+                # "All" would filter version options down to rows literally
+                # matching Journey_name = 'All' (i.e. none).
                 upstream = [
                     (upstream_column, selected[upstream_key])
                     for upstream_key, upstream_column in FILTER_COLUMNS[:i]
                     if selected.get(upstream_key) and selected[upstream_key] != ALL_VALUE
                 ]
-                # upper()/upper() for the same reason as _dimension_predicates:
-                # the value the caller selected earlier in the cascade can be
-                # cased differently from the row that's actually in the table.
-                predicates = [f'"{column}" IS NOT NULL']
+                where_clauses = [f'"{column}" IS NOT NULL']
                 params: dict[str, str] = {}
                 for j, (upstream_column, value) in enumerate(upstream):
                     param_name = f"upstream_{j}"
-                    predicates.append(f'upper("{upstream_column}") = upper(%({param_name})s)')
+                    where_clauses.append(f'"{upstream_column}" = %({param_name})s')
                     params[param_name] = value
-                where_sql = "\n          AND ".join(predicates)
-
-                # Query generation
-                query = f"""
-                    SELECT DISTINCT "{column}"
-                    FROM {HORIZONTAL_SUMMARY_TABLE}
-                    WHERE {where_sql}
-                    ORDER BY "{column}"
-                """
-                cur.execute(query, params)
-
+                cur.execute(
+                    f'SELECT DISTINCT "{column}" FROM {HORIZONTAL_SUMMARY_TABLE} '
+                    f'WHERE {" AND ".join(where_clauses)} ORDER BY "{column}"',
+                    params,
+                )
                 options[key] = [row[0] for row in cur.fetchall()]
     return options
