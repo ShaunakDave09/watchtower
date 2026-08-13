@@ -2,22 +2,27 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { fetchFunnelDetail } from "../api/client";
 import type { FunnelDetailData } from "../api/types";
+import { useFiltersContext } from "../context/FiltersContext";
 import FunnelDetailView from "../components/funnelDetail/FunnelDetailView";
 import LoadError from "../components/ui/LoadError";
 
 export default function FunnelDetail() {
   const { funnelId } = useParams();
   const navigate = useNavigate();
+  const filters = useFiltersContext();
   const [data, setData] = useState<FunnelDetailData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     setError(null);
-    fetchFunnelDetail(funnelId ?? "guest-checkout")
+    fetchFunnelDetail(funnelId ?? "guest-checkout", filters.filters.journey)
       .then(setData)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
-  }, [funnelId, reloadKey]);
+    // Refetch when the selected journey changes (e.g. cascade-corrected on
+    // load, or the user picks a different one in the filter modal) so the
+    // stage breakdown always matches what the filter bar shows as active.
+  }, [funnelId, filters.filters.journey, reloadKey]);
 
   if (error) {
     return <LoadError message={error} onRetry={() => setReloadKey((k) => k + 1)} />;

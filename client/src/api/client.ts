@@ -48,8 +48,14 @@ export function fetchOverview(filters: FilterState): Promise<OverviewData> {
   return getJson(`/api/overview?${params}`);
 }
 
-export function fetchFunnelDetail(funnelId: string): Promise<FunnelDetailData> {
-  return getJson(`/api/funnels/${funnelId}`);
+// `journey` is the currently-selected Journey_name filter value (from
+// FiltersContext) — passing it lets the backend query the real table by the
+// exact name that's actually in the data, instead of guessing one from the
+// funnelId URL slug. Optional so existing callers without a filter selection
+// still work (backend falls back to its own slug guess in that case).
+export function fetchFunnelDetail(funnelId: string, journey?: string): Promise<FunnelDetailData> {
+  const qs = journey ? `?${new URLSearchParams({ journey })}` : "";
+  return getJson(`/api/funnels/${funnelId}${qs}`);
 }
 
 export function fetchFunnelEntrypoints(funnelId: string): Promise<EntrypointData> {
