@@ -97,20 +97,20 @@ export default function FilterModal() {
 
           <div className="col-span-3">
             <span className="mb-[5px] block font-mono text-[10px] tracking-[0.05em] text-[var(--color-muted)]">
-              DATE RANGE
+              DATE
             </span>
-            <div className="mb-3 flex items-center gap-[10px]">
-              <div className="min-w-0 flex-1 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-card)] px-[10px] py-[9px] font-mono text-[12px] text-[var(--color-ink)]">
-                {filters.fromLabel}
-              </div>
-              <span className="text-[var(--color-muted)]">–</span>
-              <div className="min-w-0 flex-1 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-card-soft)] px-[10px] py-[9px] font-mono text-[12px] text-[var(--color-muted)]">
-                {filters.toLabel}
-              </div>
+            <div className="mb-3 min-w-0 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-card)] px-[10px] py-[9px] font-mono text-[12px] text-[var(--color-ink)]">
+              {filters.dateLabel}
             </div>
-            <div className="flex gap-[22px] rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-card)] p-4">
-              <CalendarMonth label={filters.monthLabelLeft} days={filters.daysLeft} onPrev={filters.prevMonth} />
-              <CalendarMonth label={filters.monthLabelRight} days={filters.daysRight} onNext={filters.nextMonth} />
+            <div className="max-w-[280px] rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-card)] p-4">
+              <CalendarMonth
+                label={filters.monthLabel}
+                days={filters.days}
+                onPrev={filters.prevMonth}
+                onNext={filters.nextMonth}
+                canGoPrev={filters.canGoPrev}
+                canGoNext={filters.canGoNext}
+              />
             </div>
           </div>
         </div>

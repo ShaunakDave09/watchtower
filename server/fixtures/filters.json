@@ -4,5 +4,6 @@
   "subProduct": ["Express Pay", "One-Click", "Guest", "Saved Cards"],
   "journey": ["Guest Checkout", "Signup", "KYC Verification", "Reactivation"],
   "version": ["v4.1", "v4.0", "v3.8"],
-  "month": ["2026-04", "2026-05", "2026-06", "2026-07", "2026-08"]
+  "month": ["2026-04", "2026-05", "2026-06", "2026-07", "2026-08"],
+  "dateRange": { "min": "2026-04-01", "max": "2026-06-30" }
 }

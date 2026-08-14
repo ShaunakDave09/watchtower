@@ -43,8 +43,7 @@ export function fetchOverview(filters: FilterState): Promise<OverviewData> {
     platform: filters.platform,
     version: filters.version,
     month: filters.month,
-    from: filters.from,
-    to: filters.to,
+    date: filters.date,
   });
   return getJson(`/api/overview?${params}`);
 }
@@ -62,8 +61,7 @@ export function fetchFunnelDetail(funnelId: string, filters: FilterState): Promi
     platform: filters.platform,
     version: filters.version,
     month: filters.month,
-    from: filters.from,
-    to: filters.to,
+    date: filters.date,
   });
   return getJson(`/api/funnels/${funnelId}?${params}`);
 }

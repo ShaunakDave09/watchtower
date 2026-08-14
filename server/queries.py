@@ -58,89 +58,6 @@ def _rows_to_steps(rows: list[dict]) -> list[dict]:
     return steps
 
 
-def _dimension_predicates(params: dict) -> list[tuple[str, str]]:
-    """Business/product/sub_product/journey/platform/version predicates, as
-    (log_name, SQL predicate) pairs — shared by both HORIZONTAL_SUMMARY_TABLE
-    and MONTHLY_SUMMARY_TABLE, since both tables carry the same dimension
-    columns. Only the temporal predicate differs between them (DATE range vs.
-    PARTITIONCOL), so each caller appends its own — see _overview_predicates
-    and fetch_month_funnel_steps.
-
-    journey/version are only included when they're not ALL_VALUE — that's
-    what makes "All" mean "don't filter on this field" rather than a literal
-    (and never-matching) string comparison.
-    """
-    predicates = [
-        ("business", '"BUSINESS" = %(business)s'),
-        ("product", '"PRODUCT" = %(product)s'),
-        ("sub_product", '"SUB_PRODUCT" = %(sub_product)s'),
-    ]
-    if params.get("journey") != ALL_VALUE:
-        predicates.append(("journey", '"Journey_name" = %(journey)s'))
-    predicates.append(("platform", '"EP_PLATFORM" = %(platform)s'))
-    if params.get("version") != ALL_VALUE:
-        predicates.append(("version", '"ENTRYPOINT_STAGE" = %(version)s'))
-    return predicates
-
-
-def _overview_predicates(params: dict) -> list[tuple[str, str]]:
-    """fetch_overview_funnel_steps's WHERE clause, as (log_name, SQL
-    predicate) pairs in the order they're applied. Used both to build the
-    real query and, on a genuine zero-row result, to work out which single
-    predicate is responsible — see _diagnose_empty_overview_result below.
-    """
-    return [
-        *_dimension_predicates(params),
-        ("date_range", '"DATE" BETWEEN %(date_from)s AND %(date_to)s'),
-    ]
-
-
-def _diagnose_empty_overview_result(params: dict) -> None:
-    """Best-effort: fetch_overview_funnel_steps matched zero rows for this
-    exact combination — figure out *which* predicate is responsible instead
-    of leaving it a mystery.
-
-    Two of the seven predicates above (platform, date_range) aren't covered
-    by fetch_filter_options's cascade: `platform` comes from a hardcoded
-    App/Web toggle in the frontend rather than real EP_PLATFORM values, and
-    the date range starts from a hardcoded default rather than the table's
-    actual DATE span. So a mismatch there is invisible to the dropdowns —
-    everything can look like a valid, cascaded selection and still match
-    zero rows. business/product/sub_product/journey/version *are* covered
-    by the cascade, so if one of those is the culprit instead, something
-    upstream let an invalid combination through.
-
-    Re-runs the query, adding one predicate at a time in the same order
-    it's applied, and logs the row count after each addition — the first
-    predicate that drops the count to zero is almost certainly the cause.
-    Only ever called after the real query already came back empty, so a
-    handful of extra COUNT(*) queries here is a fine trade for turning "the
-    funnel is empty, no idea why" into a specific answer in the app logs.
-    """
-    try:
-        pool = db.get_connection()
-        with pool.connection() as conn:
-            with conn.cursor() as cur:
-                clauses: list[str] = []
-                for name, predicate in _overview_predicates(params):
-                    clauses.append(predicate)
-                    cur.execute(
-                        f'SELECT COUNT(*) FROM {HORIZONTAL_SUMMARY_TABLE} WHERE {" AND ".join(clauses)}',
-                        params,
-                    )
-                    count = cur.fetchone()[0]
-                    logger.error("  ...after %s=%r: %d matching rows", name, params.get(name), count)
-                    if count == 0:
-                        logger.error(
-                            "fetch_overview_funnel_steps: %r eliminated every remaining row — "
-                            "this is almost certainly why the funnel shows no data for this selection",
-                            name,
-                        )
-                        return
-    except Exception:
-        logger.exception("Also failed to run empty-result diagnostics")
-
-
 def _to_table_date(iso_date: str) -> str:
     """The DATE column doesn't hold real SQL dates — it holds 'YYYYMMDD'
     strings (e.g. "20260401"). The frontend's date picker and the /api/
@@ -155,11 +72,56 @@ def _to_table_date(iso_date: str) -> str:
     already a validated "YYYY-MM-DD" string by construction — it comes from
     either the calendar widget or a hardcoded default, never free text.
     Stripping the dashes keeps it a zero-padded, fixed-width digit string,
-    which sorts identically to the dates it represents, so BETWEEN still
-    does the right thing whether the column turns out to be text or
-    integer.
+    which compares equal to the table's own values whether the column
+    turns out to be text or integer.
     """
     return iso_date.replace("-", "")
+
+
+def _from_table_date(table_date: str) -> str:
+    """The reverse of _to_table_date — "20260401" -> "2026-04-01". Used for
+    values read *out* of the DATE column (fetch_date_range's MIN/MAX)
+    rather than values going into a WHERE clause, so the frontend never
+    needs to know the table's storage quirk either way.
+    """
+    return f"{table_date[:4]}-{table_date[4:6]}-{table_date[6:8]}"
+
+
+def fetch_date_range(*, business: str, product: str, sub_product: str) -> dict:
+    """Earliest/latest real DATE for this business/product/sub_product, as
+    ISO "YYYY-MM-DD" strings — bounds the date picker so it can't be used
+    to pick a day this combination has no data for at all (the daily table
+    doesn't span every calendar day for every combination).
+
+    Only narrowed by business/product/sub_product, not journey/version/
+    platform/month — those still get to pick any day within the wider
+    business/product/sub_product range and simply see "no data" if their
+    own combination doesn't actually have data that day, same as every
+    other filter.
+    """
+    params = {
+        "business": business.upper(),
+        "product": product.upper(),
+        "sub_product": sub_product.upper(),
+    }
+
+    query = f"""
+        SELECT MIN("DATE") AS min_date, MAX("DATE") AS max_date
+        FROM {HORIZONTAL_SUMMARY_TABLE}
+        WHERE upper("BUSINESS") = upper(%(business)s)
+          AND upper("PRODUCT") = upper(%(product)s)
+          AND upper("SUB_PRODUCT") = upper(%(sub_product)s)
+    """
+
+    pool = db.get_connection()
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, params)
+            min_date, max_date = cur.fetchone()
+    return {
+        "min": _from_table_date(str(min_date)) if min_date is not None else None,
+        "max": _from_table_date(str(max_date)) if max_date is not None else None,
+    }
 
 
 def _to_partition_month(iso_month: str) -> str:
@@ -180,13 +142,17 @@ def fetch_month_options() -> list[str]:
     which ones have data for the current selection — the funnel query itself
     is what surfaces a genuinely empty result for a bad combination.
     """
+    query = f"""
+        SELECT DISTINCT "PARTITIONCOL"
+        FROM {MONTHLY_SUMMARY_TABLE}
+        WHERE "PARTITIONCOL" IS NOT NULL
+        ORDER BY "PARTITIONCOL"
+    """
+
     pool = db.get_connection()
     with pool.connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                f'SELECT DISTINCT "PARTITIONCOL" FROM {MONTHLY_SUMMARY_TABLE} '
-                f'WHERE "PARTITIONCOL" IS NOT NULL ORDER BY "PARTITIONCOL"'
-            )
+            cur.execute(query)
             rows = cur.fetchall()
     return [f"{str(row[0])[:4]}-{str(row[0])[4:]}" for row in rows]
 
@@ -204,27 +170,53 @@ def fetch_month_funnel_steps(
     """Same dimension filtering as fetch_overview_funnel_steps, but
     aggregates MONTHLY_SUMMARY_TABLE's pre-computed monthly rows for a
     single PARTITIONCOL instead of summing the daily table over a date
-    range. Cast to text on both sides of the PARTITIONCOL comparison since
-    the column's declared type isn't guaranteed (could be integer or text
-    depending on how the gold layer materialized it) — this works either way.
+    range — a genuinely separate, coarser data path, not just another way
+    to express the same date range.
+
+    Uppercasing every value in Python and wrapping both sides in upper() in
+    the SQL is deliberately belt-and-suspenders: the same business/product/
+    journey/etc. name can show up with inconsistent casing across rows
+    (e.g. "PERSONALLOAN" in some places, "Personalloan" in others), so an
+    exact `=` would silently drop rows a human would consider the same
+    value. coalesce(..., 'APP') on EP_PLATFORM treats a null platform as
+    App rather than excluding the row entirely.
+
+    The query is built directly here rather than through a shared predicate
+    helper — journey/version are the only two parts of the WHERE clause
+    that ever change shape (dropped entirely when the filter is "All"), so
+    a couple of `if` blocks appending to the query string keeps the whole
+    thing visible and easy to copy into a SQL client to debug, instead of
+    being assembled from predicate fragments defined somewhere else.
     """
     params = {
-        "business": business,
-        "product": product,
-        "sub_product": sub_product,
-        "journey": journey,
-        "platform": platform,
-        "version": version,
+        "business": business.upper(),
+        "product": product.upper(),
+        "sub_product": sub_product.upper(),
+        "journey": journey.upper(),
+        "platform": platform.upper(),
+        "version": version.upper(),
         "month": _to_partition_month(month),
     }
-    predicates = [*_dimension_predicates(params), ("month", 'CAST("PARTITIONCOL" AS TEXT) = %(month)s')]
+
     query = f"""
         SELECT "STAGE_ORDER", "STAGE_NAMES", SUM(users) AS users
         FROM {MONTHLY_SUMMARY_TABLE}
-        WHERE {" AND ".join(predicate for _, predicate in predicates)}
+        WHERE upper("BUSINESS") = upper(%(business)s)
+          AND upper("PRODUCT") = upper(%(product)s)
+          AND upper("SUB_PRODUCT") = upper(%(sub_product)s)
+          AND coalesce(upper("EP_PLATFORM"), 'APP') = upper(%(platform)s)
+          AND CAST("PARTITIONCOL" AS TEXT) = %(month)s"""
+    if journey != ALL_VALUE:
+        query += """
+          AND upper("Journey_name") = upper(%(journey)s)"""
+    if version != ALL_VALUE:
+        query += """
+          AND upper("ENTRYPOINT_STAGE") = upper(%(version)s)"""
+    query += """
         GROUP BY "STAGE_ORDER", "STAGE_NAMES"
         ORDER BY "STAGE_ORDER"
     """
+
     pool = db.get_connection()
     with pool.connection() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
@@ -243,27 +235,42 @@ def fetch_overview_funnel_steps(
     journey: str,
     platform: str,
     version: str,
-    date_from: str,
-    date_to: str,
+    date: str,
 ) -> list[dict]:
+    """Same reasoning as fetch_month_funnel_steps (upper() everywhere,
+    coalesce on platform, journey/version dropped entirely on "All") —
+    aggregates the daily table for a single calendar day instead of a
+    PARTITIONCOL (the filter panel picks one date, not a range).
+    """
     params = {
-        "business": business,
-        "product": product,
-        "sub_product": sub_product,
-        "journey": journey,
-        "platform": platform,
-        "version": version,
-        "date_from": _to_table_date(date_from),
-        "date_to": _to_table_date(date_to),
+        "business": business.upper(),
+        "product": product.upper(),
+        "sub_product": sub_product.upper(),
+        "journey": journey.upper(),
+        "platform": platform.upper(),
+        "version": version.upper(),
+        "date": _to_table_date(date),
     }
-    predicates = _overview_predicates(params)
+
     query = f"""
         SELECT "STAGE_ORDER", "STAGE_NAMES", SUM(users) AS users
         FROM {HORIZONTAL_SUMMARY_TABLE}
-        WHERE {" AND ".join(predicate for _, predicate in predicates)}
+        WHERE upper("BUSINESS") = upper(%(business)s)
+          AND upper("PRODUCT") = upper(%(product)s)
+          AND upper("SUB_PRODUCT") = upper(%(sub_product)s)
+          AND coalesce(upper("EP_PLATFORM"), 'APP') = upper(%(platform)s)
+          AND "DATE" = %(date)s"""
+    if journey != ALL_VALUE:
+        query += """
+          AND upper("Journey_name") = upper(%(journey)s)"""
+    if version != ALL_VALUE:
+        query += """
+          AND upper("ENTRYPOINT_STAGE") = upper(%(version)s)"""
+    query += """
         GROUP BY "STAGE_ORDER", "STAGE_NAMES"
         ORDER BY "STAGE_ORDER"
     """
+
     pool = db.get_connection()
     with pool.connection() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
@@ -271,8 +278,66 @@ def fetch_overview_funnel_steps(
             rows = cur.fetchall()
     if not rows:
         logger.error("fetch_overview_funnel_steps matched 0 rows for params=%r", params)
-        _diagnose_empty_overview_result(params)
+        _diagnose_empty_overview_result(params, journey, version)
     return _rows_to_steps(rows)
+
+
+def _diagnose_empty_overview_result(params: dict, journey: str, version: str) -> None:
+    """Best-effort: fetch_overview_funnel_steps matched zero rows for this
+    exact combination — figure out *which* predicate is responsible instead
+    of leaving it a mystery.
+
+    date is the one predicate below not covered by fetch_filter_options's
+    cascade: it starts from a hardcoded default rather than the table's
+    actual DATE span, so a mismatch there is invisible to the dropdowns —
+    everything can look like a valid, cascaded selection and still match
+    zero rows purely because that single day has no real data.
+
+    Re-runs the query, adding one predicate at a time in the same order
+    fetch_overview_funnel_steps applies them, and logs the row count after
+    each addition — the first predicate that drops the count to zero is
+    almost certainly the cause. Only ever called after the real query
+    already came back empty, so a handful of extra COUNT(*) queries here is
+    a fine trade for turning "the funnel is empty, no idea why" into a
+    specific answer in the app logs.
+    """
+    try:
+        clauses = [
+            ("business", 'upper("BUSINESS") = upper(%(business)s)'),
+            ("product", 'upper("PRODUCT") = upper(%(product)s)'),
+            ("sub_product", 'upper("SUB_PRODUCT") = upper(%(sub_product)s)'),
+            ("platform", "coalesce(upper(\"EP_PLATFORM\"), 'APP') = upper(%(platform)s)"),
+            ("date", '"DATE" = %(date)s'),
+        ]
+        if journey != ALL_VALUE:
+            clauses.append(("journey", 'upper("Journey_name") = upper(%(journey)s)'))
+        if version != ALL_VALUE:
+            clauses.append(("version", 'upper("ENTRYPOINT_STAGE") = upper(%(version)s)'))
+
+        pool = db.get_connection()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                applied: list[str] = []
+                for name, clause in clauses:
+                    applied.append(clause)
+                    query = f"""
+                        SELECT COUNT(*)
+                        FROM {HORIZONTAL_SUMMARY_TABLE}
+                        WHERE {" AND ".join(applied)}
+                    """
+                    cur.execute(query, params)
+
+                    count = cur.fetchone()[0]
+                    logger.error("  ...after %s=%r: %d matching rows", name, params.get(name), count)
+                    if count == 0:
+                        logger.error(
+                            "fetch_overview_funnel_steps: %r eliminated every remaining row — "
+                            "this is almost certainly why the funnel shows no data for this selection",
+                            name,
+                        )
+                        return
+    except Exception:
+        logger.exception("Also failed to run empty-result diagnostics")
 
 
 def fetch_funnel_steps(
@@ -284,20 +349,17 @@ def fetch_funnel_steps(
     platform: str,
     version: str,
     month: str,
-    date_from: str,
-    date_to: str,
+    date: str,
 ) -> list[dict]:
     """Single entry point for both Overview's funnel chart and Funnel
     Detail's stage table — they're the exact same aggregation, grouped by
     STAGE_ORDER/STAGE_NAMES, just labeled differently for their respective
-    pages (Funnel Detail used to only filter by journey; see git history for
-    why that was a bug). This is also where the Month filter takes effect:
-    month == ALL_VALUE (the default) means "no month picked," so it
-    aggregates the daily table over date_from/date_to same as before the
-    Month filter existed; any real month instead queries
-    MONTHLY_SUMMARY_TABLE's pre-aggregated rows for that PARTITIONCOL
-    directly — a coarser, separate data path, not just another way to
-    express the same date range.
+    pages. This is also where the Month filter takes effect: month ==
+    ALL_VALUE (the default) means "no month picked," so it aggregates the
+    daily table for the single selected `date` same as before the Month
+    filter existed; any real month instead queries MONTHLY_SUMMARY_TABLE's
+    pre-aggregated rows for that PARTITIONCOL directly — a coarser,
+    separate data path, not just another way to express the same date.
     """
     if month != ALL_VALUE:
         return fetch_month_funnel_steps(
@@ -316,8 +378,7 @@ def fetch_funnel_steps(
         journey=journey,
         platform=platform,
         version=version,
-        date_from=date_from,
-        date_to=date_to,
+        date=date,
     )
 
 
@@ -361,6 +422,12 @@ def fetch_filter_options(
 
     Shape of the return value matches FilterOptions exactly, so the router
     can return this (or the fixture) with no frontend changes either way.
+
+    The number of upstream fields narrowing each column varies (0 for
+    business, up to 4 for version), so unlike the fixed-shape funnel-steps
+    queries above, this one genuinely needs to build its WHERE clause in a
+    loop rather than as literal `if` blocks — the loop and its `where_clauses`
+    list are local to this one function, not a shared predicate helper.
     """
     # Selected values, keyed by FilterOptions key, in cascade order — used
     # below to build the WHERE clause for each column from whatever's
@@ -392,16 +459,24 @@ def fetch_filter_options(
                     for upstream_key, upstream_column in FILTER_COLUMNS[:i]
                     if selected.get(upstream_key) and selected[upstream_key] != ALL_VALUE
                 ]
+
+                # upper()/upper() for the same reason as the funnel-steps
+                # queries: the value selected earlier in the cascade can be
+                # cased differently from the row that's actually in the table.
                 where_clauses = [f'"{column}" IS NOT NULL']
                 params: dict[str, str] = {}
                 for j, (upstream_column, value) in enumerate(upstream):
                     param_name = f"upstream_{j}"
-                    where_clauses.append(f'"{upstream_column}" = %({param_name})s')
+                    where_clauses.append(f'upper("{upstream_column}") = upper(%({param_name})s)')
                     params[param_name] = value
-                cur.execute(
-                    f'SELECT DISTINCT "{column}" FROM {HORIZONTAL_SUMMARY_TABLE} '
-                    f'WHERE {" AND ".join(where_clauses)} ORDER BY "{column}"',
-                    params,
-                )
+
+                query = f"""
+                    SELECT DISTINCT "{column}"
+                    FROM {HORIZONTAL_SUMMARY_TABLE}
+                    WHERE {" AND ".join(where_clauses)}
+                    ORDER BY "{column}"
+                """
+                cur.execute(query, params)
+
                 options[key] = [row[0] for row in cur.fetchall()]
     return options
