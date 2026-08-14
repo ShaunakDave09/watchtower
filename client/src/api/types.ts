@@ -1,3 +1,12 @@
+// Earliest/latest selectable "YYYY-MM-DD", bounded by whatever data
+// actually exists for the selected business/product/subProduct — either
+// bound can be null if that hasn't been narrowed down yet (or the query
+// failed and there's no fixture bound to fall back to either).
+export interface DateRange {
+  min: string | null;
+  max: string | null;
+}
+
 export interface FilterOptions {
   business: string[];
   product: string[];
@@ -8,6 +17,10 @@ export interface FilterOptions {
   // the cascade — see fetchFunnelDetail/fetchOverview's `month` param and
   // server/queries.py's fetch_month_options.
   month: string[];
+  // Narrowed by business/product/subProduct only (see
+  // server/queries.py's fetch_date_range) — bounds the date picker so it
+  // can't be used to pick a day this combination has no data for at all.
+  dateRange: DateRange;
 }
 
 // Sentinel meaning "don't filter on this field" — must match server/queries.py's

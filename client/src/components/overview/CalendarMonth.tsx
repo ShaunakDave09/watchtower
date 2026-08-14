@@ -3,6 +3,7 @@ import type { CalendarDay } from "../../hooks/useFilters";
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
 function dayClasses(day: CalendarDay) {
+  if (day.disabled) return "text-[var(--color-faint)] cursor-not-allowed";
   if (day.isSelected) return "bg-[var(--color-accent)] text-white font-semibold rounded-lg";
   return "rounded-lg hover:bg-[var(--color-accent-chip)]";
 }
@@ -12,16 +13,19 @@ interface CalendarMonthProps {
   days: (CalendarDay | null)[];
   onPrev?: () => void;
   onNext?: () => void;
+  canGoPrev?: boolean;
+  canGoNext?: boolean;
 }
 
-export default function CalendarMonth({ label, days, onPrev, onNext }: CalendarMonthProps) {
+export default function CalendarMonth({ label, days, onPrev, onNext, canGoPrev = true, canGoNext = true }: CalendarMonthProps) {
   return (
     <div className="flex-1">
       <div className="mb-[10px] flex items-center">
         {onPrev ? (
           <button
             onClick={onPrev}
-            className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] border border-[var(--color-border-strong)] bg-[var(--color-card)] text-[14px] leading-none text-[var(--color-body)] hover:bg-[var(--color-accent-soft)]"
+            disabled={!canGoPrev}
+            className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] border border-[var(--color-border-strong)] bg-[var(--color-card)] text-[14px] leading-none text-[var(--color-body)] hover:bg-[var(--color-accent-soft)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[var(--color-card)]"
           >
             ‹
           </button>
@@ -32,7 +36,8 @@ export default function CalendarMonth({ label, days, onPrev, onNext }: CalendarM
         {onNext ? (
           <button
             onClick={onNext}
-            className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] border border-[var(--color-border-strong)] bg-[var(--color-card)] text-[14px] leading-none text-[var(--color-body)] hover:bg-[var(--color-accent-soft)]"
+            disabled={!canGoNext}
+            className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] border border-[var(--color-border-strong)] bg-[var(--color-card)] text-[14px] leading-none text-[var(--color-body)] hover:bg-[var(--color-accent-soft)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[var(--color-card)]"
           >
             ›
           </button>
@@ -53,6 +58,7 @@ export default function CalendarMonth({ label, days, onPrev, onNext }: CalendarM
             <button
               key={i}
               onClick={day.onClick}
+              disabled={day.disabled}
               className={`flex h-8 items-center justify-center border-0 p-0 font-sans text-[12px] text-[var(--color-ink)] ${dayClasses(day)}`}
             >
               {day.date}

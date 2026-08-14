@@ -47,6 +47,19 @@ def get_filters(
     except Exception:
         logger.exception("fetch_month_options failed, falling back to fixture months")
         options["month"] = json.loads((FIXTURES_DIR / "filters.json").read_text())["month"]
+    try:
+        # Bounds the date picker to the selected business/product/sub_product's
+        # actual DATE span — nothing to compute yet if the caller hasn't
+        # picked all three (e.g. the very first call before defaults settle).
+        if business and product and sub_product:
+            options["dateRange"] = queries.fetch_date_range(
+                business=business, product=product, sub_product=sub_product
+            )
+        else:
+            options["dateRange"] = {"min": None, "max": None}
+    except Exception:
+        logger.exception("fetch_date_range failed, falling back to fixture date range")
+        options["dateRange"] = json.loads((FIXTURES_DIR / "filters.json").read_text())["dateRange"]
     return _with_all_option(options)
 
 

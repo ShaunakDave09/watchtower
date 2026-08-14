@@ -18,11 +18,18 @@ const FiltersContext = createContext<FiltersContextValue | null>(null);
 // isn't part of this cascade (nothing narrows it, and it narrows nothing
 // downstream) purely so a stale/removed month selection still gets snapped
 // back to a real option whenever this correction pass happens to run.
-const CASCADE_KEYS: (keyof FilterOptions)[] = ["business", "product", "subProduct", "journey", "version", "month"];
+const CASCADE_KEYS: (keyof Omit<FilterOptions, "dateRange">)[] = [
+  "business",
+  "product",
+  "subProduct",
+  "journey",
+  "version",
+  "month",
+];
 
 export function FiltersProvider({ children }: { children: ReactNode }) {
-  const filters = useFilters();
   const [options, setOptions] = useState<FilterOptions | null>(null);
+  const filters = useFilters(options?.dateRange);
 
   // FiltersProvider is mounted once, above the router's <Outlet/> (see
   // AppShell), so `filters` and `options` here are a single shared instance
@@ -66,6 +73,21 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
           filters.set(key as keyof FilterState, validValues[0]);
           break;
         }
+      }
+
+      // Same idea as the cascade correction above, but for the date picker:
+      // business/product/subProduct narrow opts.dateRange (see
+      // FilterOptions.dateRange), and the currently selected date may now
+      // fall outside it — e.g. it was picked under a different business
+      // whose data spans a different window. Snap to the nearest bound
+      // (and move the calendar to that month) instead of leaving a date
+      // selected that this combination has no data for at all.
+      const { min, max } = opts.dateRange;
+      const currentDate = filters.filters.date;
+      if (min && currentDate < min) {
+        filters.jumpToDate(min);
+      } else if (max && currentDate > max) {
+        filters.jumpToDate(max);
       }
     });
     // Only the four fields that actually drive the cascade belong here.

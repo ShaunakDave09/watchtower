@@ -78,6 +78,52 @@ def _to_table_date(iso_date: str) -> str:
     return iso_date.replace("-", "")
 
 
+def _from_table_date(table_date: str) -> str:
+    """The reverse of _to_table_date — "20260401" -> "2026-04-01". Used for
+    values read *out* of the DATE column (fetch_date_range's MIN/MAX)
+    rather than values going into a WHERE clause, so the frontend never
+    needs to know the table's storage quirk either way.
+    """
+    return f"{table_date[:4]}-{table_date[4:6]}-{table_date[6:8]}"
+
+
+def fetch_date_range(*, business: str, product: str, sub_product: str) -> dict:
+    """Earliest/latest real DATE for this business/product/sub_product, as
+    ISO "YYYY-MM-DD" strings — bounds the date picker so it can't be used
+    to pick a day this combination has no data for at all (the daily table
+    doesn't span every calendar day for every combination).
+
+    Only narrowed by business/product/sub_product, not journey/version/
+    platform/month — those still get to pick any day within the wider
+    business/product/sub_product range and simply see "no data" if their
+    own combination doesn't actually have data that day, same as every
+    other filter.
+    """
+    params = {
+        "business": business.upper(),
+        "product": product.upper(),
+        "sub_product": sub_product.upper(),
+    }
+
+    query = f"""
+        SELECT MIN("DATE") AS min_date, MAX("DATE") AS max_date
+        FROM {HORIZONTAL_SUMMARY_TABLE}
+        WHERE upper("BUSINESS") = upper(%(business)s)
+          AND upper("PRODUCT") = upper(%(product)s)
+          AND upper("SUB_PRODUCT") = upper(%(sub_product)s)
+    """
+
+    pool = db.get_connection()
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, params)
+            min_date, max_date = cur.fetchone()
+    return {
+        "min": _from_table_date(str(min_date)) if min_date is not None else None,
+        "max": _from_table_date(str(max_date)) if max_date is not None else None,
+    }
+
+
 def _to_partition_month(iso_month: str) -> str:
     """"YYYY-MM" (what the Month filter and this module's callers deal in)
     -> PARTITIONCOL's actual "YYYYMM" form (e.g. "2026-08" -> "202608").

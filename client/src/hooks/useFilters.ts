@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ALL_FILTER_VALUE } from "../api/types";
-import type { FilterState } from "../api/types";
+import type { DateRange, FilterState } from "../api/types";
 
 // Just a starting guess, shown before the real filter options have loaded
 // (and used as-is if the backend ever has to fall back to the static
@@ -31,6 +31,7 @@ export interface CalendarDay {
   date: number;
   iso: string;
   isSelected: boolean;
+  disabled: boolean;
   onClick: () => void;
 }
 
@@ -44,7 +45,20 @@ function fmtShort(iso: string): string {
   return `${MONTHS[m - 1].slice(0, 3)} ${d}`;
 }
 
-export function useFilters() {
+// Plain string comparison is correct here — "YYYY-MM-DD" sorts identically
+// whether compared as strings or as dates, so no need to parse either side.
+function isOutsideRange(iso: string, range?: DateRange): boolean {
+  if (range?.min && iso < range.min) return true;
+  if (range?.max && iso > range.max) return true;
+  return false;
+}
+
+// `dateRange` bounds the calendar to whatever business/product/subProduct
+// combination is currently selected (see FiltersContext, which passes
+// options.dateRange in once it's loaded) — both the individual days and
+// month navigation respect it, so there's no way to land on or even
+// scroll to a day this combination has no data for at all.
+export function useFilters(dateRange?: DateRange) {
   const [open, setOpen] = useState(false);
   const [filters, setFilters] = useState<FilterState>(DEFAULTS);
   const [viewYear, setViewYear] = useState(2026);
@@ -56,6 +70,18 @@ export function useFilters() {
 
   function selectDate(iso: string) {
     set("date", iso);
+  }
+
+  // Sets the selected date *and* moves the calendar view to that date's
+  // month — used when a filter change (e.g. narrower business/product)
+  // pushes the previously-selected date outside the new range, so the
+  // corrected date and the open calendar never disagree about which month
+  // is showing.
+  function jumpToDate(iso: string) {
+    const [y, m] = iso.split("-").map(Number);
+    setFilters((f) => ({ ...f, date: iso }));
+    setViewYear(y);
+    setViewMonth(m - 1);
   }
 
   function shiftMonth(n: number) {
@@ -73,6 +99,10 @@ export function useFilters() {
     setViewYear(y);
   }
 
+  const viewYearMonth = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}`;
+  const canGoPrev = !dateRange?.min || viewYearMonth > dateRange.min.slice(0, 7);
+  const canGoNext = !dateRange?.max || viewYearMonth < dateRange.max.slice(0, 7);
+
   const days = useMemo((): (CalendarDay | null)[] => {
     const startW = new Date(viewYear, viewMonth, 1).getDay();
     const dim = new Date(viewYear, viewMonth + 1, 0).getDate();
@@ -80,17 +110,21 @@ export function useFilters() {
     for (let i = 0; i < startW; i++) cells.push(null);
     for (let d = 1; d <= dim; d++) {
       const iso = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      const disabled = isOutsideRange(iso, dateRange);
       cells.push({
         date: d,
         iso,
         isSelected: iso === filters.date,
-        onClick: () => selectDate(iso),
+        disabled,
+        onClick: () => {
+          if (!disabled) selectDate(iso);
+        },
       });
     }
     while (cells.length < 42) cells.push(null);
     return cells;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewYear, viewMonth, filters.date]);
+  }, [viewYear, viewMonth, filters.date, dateRange?.min, dateRange?.max]);
 
   const chips = [
     { cat: "Business", val: filters.business },
@@ -108,12 +142,15 @@ export function useFilters() {
     setOpen,
     filters,
     set,
+    jumpToDate,
     chips,
     dateLabel: fmtShort(filters.date),
     monthLabel: `${MONTHS[viewMonth]} ${viewYear}`,
     days,
-    prevMonth: () => shiftMonth(-1),
-    nextMonth: () => shiftMonth(1),
+    canGoPrev,
+    canGoNext,
+    prevMonth: () => canGoPrev && shiftMonth(-1),
+    nextMonth: () => canGoNext && shiftMonth(1),
     reset: () => {
       setFilters(DEFAULTS);
       setViewYear(2026);

@@ -103,7 +103,14 @@ export default function FilterModal() {
               {filters.dateLabel}
             </div>
             <div className="max-w-[280px] rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-card)] p-4">
-              <CalendarMonth label={filters.monthLabel} days={filters.days} onPrev={filters.prevMonth} onNext={filters.nextMonth} />
+              <CalendarMonth
+                label={filters.monthLabel}
+                days={filters.days}
+                onPrev={filters.prevMonth}
+                onNext={filters.nextMonth}
+                canGoPrev={filters.canGoPrev}
+                canGoNext={filters.canGoNext}
+              />
             </div>
           </div>
         </div>
