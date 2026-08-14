@@ -3,8 +3,7 @@ import type { CalendarDay } from "../../hooks/useFilters";
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
 function dayClasses(day: CalendarDay) {
-  if (day.isStart || day.isEnd) return "bg-[var(--color-accent)] text-white font-semibold rounded-lg";
-  if (day.inRange) return "bg-[var(--color-accent-soft)] rounded-sm";
+  if (day.isSelected) return "bg-[var(--color-accent)] text-white font-semibold rounded-lg";
   return "rounded-lg hover:bg-[var(--color-accent-chip)]";
 }
 

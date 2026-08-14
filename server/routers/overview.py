@@ -74,8 +74,7 @@ def get_overview(
     platform: str = Query(...),
     version: str = Query(...),
     month: str = Query(...),
-    date_from: str = Query(..., alias="from"),
-    date_to: str = Query(..., alias="to"),
+    date: str = Query(...),
 ) -> dict:
     data = json.loads((FIXTURES_DIR / "overview.json").read_text())
     # kpis/retention/timeToConvert/opportunity stay on fixtures for now —
@@ -89,8 +88,7 @@ def get_overview(
             platform=platform,
             version=version,
             month=month,
-            date_from=date_from,
-            date_to=date_to,
+            date=date,
         )
     except Exception:
         # The query itself failed to run (DB unreachable, bad table, etc.) —

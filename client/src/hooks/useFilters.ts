@@ -24,16 +24,13 @@ const DEFAULTS: FilterState = {
   version: ALL_FILTER_VALUE,
   month: ALL_FILTER_VALUE,
   platform: "App",
-  from: "2026-04-01",
-  to: "2026-06-30",
+  date: "2026-04-01",
 };
 
 export interface CalendarDay {
   date: number;
   iso: string;
-  isStart: boolean;
-  isEnd: boolean;
-  inRange: boolean;
+  isSelected: boolean;
   onClick: () => void;
 }
 
@@ -41,11 +38,6 @@ const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
-
-function toTime(iso: string): number {
-  const [y, m, d] = iso.split("-").map(Number);
-  return new Date(y, m - 1, d).getTime();
-}
 
 function fmtShort(iso: string): string {
   const [, m, d] = iso.split("-").map(Number);
@@ -55,7 +47,6 @@ function fmtShort(iso: string): string {
 export function useFilters() {
   const [open, setOpen] = useState(false);
   const [filters, setFilters] = useState<FilterState>(DEFAULTS);
-  const [pendingEnd, setPendingEnd] = useState(false);
   const [viewYear, setViewYear] = useState(2026);
   const [viewMonth, setViewMonth] = useState(3); // 0-indexed: April
 
@@ -63,19 +54,8 @@ export function useFilters() {
     setFilters((f) => ({ ...f, [key]: value }));
   }
 
-  function handleDay(iso: string) {
-    const t = toTime(iso);
-    const f = toTime(filters.from);
-    if (!pendingEnd) {
-      setFilters((s) => ({ ...s, from: iso, to: "" }));
-      setPendingEnd(true);
-    } else if (t >= f) {
-      setFilters((s) => ({ ...s, to: iso }));
-      setPendingEnd(false);
-    } else {
-      setFilters((s) => ({ ...s, from: iso, to: "" }));
-      setPendingEnd(true);
-    }
+  function selectDate(iso: string) {
+    set("date", iso);
   }
 
   function shiftMonth(n: number) {
@@ -93,42 +73,24 @@ export function useFilters() {
     setViewYear(y);
   }
 
-  function buildDays(year: number, month: number): (CalendarDay | null)[] {
-    const startW = new Date(year, month, 1).getDay();
-    const dim = new Date(year, month + 1, 0).getDate();
-    const fT = toTime(filters.from);
-    const tT = filters.to ? toTime(filters.to) : null;
+  const days = useMemo((): (CalendarDay | null)[] => {
+    const startW = new Date(viewYear, viewMonth, 1).getDay();
+    const dim = new Date(viewYear, viewMonth + 1, 0).getDate();
     const cells: (CalendarDay | null)[] = [];
     for (let i = 0; i < startW; i++) cells.push(null);
     for (let d = 1; d <= dim; d++) {
-      const iso = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-      const cT = new Date(year, month, d).getTime();
+      const iso = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
       cells.push({
         date: d,
         iso,
-        isStart: cT === fT,
-        isEnd: tT !== null && cT === tT,
-        inRange: tT !== null && cT > fT && cT < tT,
-        onClick: () => handleDay(iso),
+        isSelected: iso === filters.date,
+        onClick: () => selectDate(iso),
       });
     }
     while (cells.length < 42) cells.push(null);
     return cells;
-  }
-
-  const nextMonthIdx = viewMonth === 11 ? 0 : viewMonth + 1;
-  const nextYearForMonth = viewMonth === 11 ? viewYear + 1 : viewYear;
-
-  const daysLeft = useMemo(
-    () => buildDays(viewYear, viewMonth),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [viewYear, viewMonth, filters.from, filters.to],
-  );
-  const daysRight = useMemo(
-    () => buildDays(nextYearForMonth, nextMonthIdx),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [viewYear, viewMonth, filters.from, filters.to],
-  );
+  }, [viewYear, viewMonth, filters.date]);
 
   const chips = [
     { cat: "Business", val: filters.business },
@@ -138,7 +100,7 @@ export function useFilters() {
     { cat: "Version", val: filters.version },
     { cat: "Month", val: filters.month },
     { cat: "Platform", val: filters.platform },
-    { cat: "Dates", val: `${fmtShort(filters.from)} – ${filters.to ? fmtShort(filters.to) : "…"}` },
+    { cat: "Date", val: fmtShort(filters.date) },
   ];
 
   return {
@@ -147,17 +109,13 @@ export function useFilters() {
     filters,
     set,
     chips,
-    fromLabel: fmtShort(filters.from),
-    toLabel: filters.to ? fmtShort(filters.to) : "Select end date",
-    monthLabelLeft: `${MONTHS[viewMonth]} ${viewYear}`,
-    monthLabelRight: `${MONTHS[nextMonthIdx]} ${nextYearForMonth}`,
-    daysLeft,
-    daysRight,
+    dateLabel: fmtShort(filters.date),
+    monthLabel: `${MONTHS[viewMonth]} ${viewYear}`,
+    days,
     prevMonth: () => shiftMonth(-1),
     nextMonth: () => shiftMonth(1),
     reset: () => {
       setFilters(DEFAULTS);
-      setPendingEnd(false);
       setViewYear(2026);
       setViewMonth(3);
     },

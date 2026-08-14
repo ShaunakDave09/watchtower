@@ -30,8 +30,7 @@ def get_funnel_detail(
     platform: str = Query(...),
     version: str = Query(...),
     month: str = Query(...),
-    date_from: str = Query(..., alias="from"),
-    date_to: str = Query(..., alias="to"),
+    date: str = Query(...),
 ) -> dict:
     funnels = json.loads((FIXTURES_DIR / "funnel_detail.json").read_text())
     data = funnels.get(funnel_id, funnels["guest-checkout"])
@@ -46,8 +45,7 @@ def get_funnel_detail(
             platform=platform,
             version=version,
             month=month,
-            date_from=date_from,
-            date_to=date_to,
+            date=date,
         )
     except Exception:
         logger.exception("fetch_funnel_steps failed, falling back to fixture stages")

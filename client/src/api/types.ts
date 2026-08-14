@@ -32,13 +32,13 @@ export interface FilterState {
   journey: string;
   version: string;
   // "YYYY-MM", or ALL_FILTER_VALUE. Picking a real month queries the
-  // monthly summary table directly instead of the daily table's from/to
-  // range — a separate, coarser data path (see server/queries.py's
-  // fetch_funnel_steps).
+  // monthly summary table directly instead of the daily table's single
+  // selected date — a separate, coarser data path (see
+  // server/queries.py's fetch_funnel_steps).
   month: string;
   platform: "App" | "Web";
-  from: string;
-  to: string;
+  // "YYYY-MM-DD" — a single calendar day, not a range.
+  date: string;
 }
 
 export interface Sparkline {

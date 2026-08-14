@@ -72,9 +72,8 @@ def _to_table_date(iso_date: str) -> str:
     already a validated "YYYY-MM-DD" string by construction — it comes from
     either the calendar widget or a hardcoded default, never free text.
     Stripping the dashes keeps it a zero-padded, fixed-width digit string,
-    which sorts identically to the dates it represents, so BETWEEN still
-    does the right thing whether the column turns out to be text or
-    integer.
+    which compares equal to the table's own values whether the column
+    turns out to be text or integer.
     """
     return iso_date.replace("-", "")
 
@@ -190,13 +189,12 @@ def fetch_overview_funnel_steps(
     journey: str,
     platform: str,
     version: str,
-    date_from: str,
-    date_to: str,
+    date: str,
 ) -> list[dict]:
     """Same reasoning as fetch_month_funnel_steps (upper() everywhere,
     coalesce on platform, journey/version dropped entirely on "All") —
-    aggregates the daily table over a date range instead of a single
-    PARTITIONCOL.
+    aggregates the daily table for a single calendar day instead of a
+    PARTITIONCOL (the filter panel picks one date, not a range).
     """
     params = {
         "business": business.upper(),
@@ -205,8 +203,7 @@ def fetch_overview_funnel_steps(
         "journey": journey.upper(),
         "platform": platform.upper(),
         "version": version.upper(),
-        "date_from": _to_table_date(date_from),
-        "date_to": _to_table_date(date_to),
+        "date": _to_table_date(date),
     }
 
     query = f"""
@@ -216,7 +213,7 @@ def fetch_overview_funnel_steps(
           AND upper("PRODUCT") = upper(%(product)s)
           AND upper("SUB_PRODUCT") = upper(%(sub_product)s)
           AND coalesce(upper("EP_PLATFORM"), 'APP') = upper(%(platform)s)
-          AND "DATE" BETWEEN %(date_from)s AND %(date_to)s"""
+          AND "DATE" = %(date)s"""
     if journey != ALL_VALUE:
         query += """
           AND upper("Journey_name") = upper(%(journey)s)"""
@@ -244,12 +241,11 @@ def _diagnose_empty_overview_result(params: dict, journey: str, version: str) ->
     exact combination — figure out *which* predicate is responsible instead
     of leaving it a mystery.
 
-    date_range is the one predicate below not covered by
-    fetch_filter_options's cascade: it starts from a hardcoded default
-    rather than the table's actual DATE span, so a mismatch there is
-    invisible to the dropdowns — everything can look like a valid, cascaded
-    selection and still match zero rows purely because the date window
-    doesn't overlap any real data.
+    date is the one predicate below not covered by fetch_filter_options's
+    cascade: it starts from a hardcoded default rather than the table's
+    actual DATE span, so a mismatch there is invisible to the dropdowns —
+    everything can look like a valid, cascaded selection and still match
+    zero rows purely because that single day has no real data.
 
     Re-runs the query, adding one predicate at a time in the same order
     fetch_overview_funnel_steps applies them, and logs the row count after
@@ -265,7 +261,7 @@ def _diagnose_empty_overview_result(params: dict, journey: str, version: str) ->
             ("product", 'upper("PRODUCT") = upper(%(product)s)'),
             ("sub_product", 'upper("SUB_PRODUCT") = upper(%(sub_product)s)'),
             ("platform", "coalesce(upper(\"EP_PLATFORM\"), 'APP') = upper(%(platform)s)"),
-            ("date_range", '"DATE" BETWEEN %(date_from)s AND %(date_to)s'),
+            ("date", '"DATE" = %(date)s'),
         ]
         if journey != ALL_VALUE:
             clauses.append(("journey", 'upper("Journey_name") = upper(%(journey)s)'))
@@ -307,18 +303,17 @@ def fetch_funnel_steps(
     platform: str,
     version: str,
     month: str,
-    date_from: str,
-    date_to: str,
+    date: str,
 ) -> list[dict]:
     """Single entry point for both Overview's funnel chart and Funnel
     Detail's stage table — they're the exact same aggregation, grouped by
     STAGE_ORDER/STAGE_NAMES, just labeled differently for their respective
     pages. This is also where the Month filter takes effect: month ==
     ALL_VALUE (the default) means "no month picked," so it aggregates the
-    daily table over date_from/date_to same as before the Month filter
-    existed; any real month instead queries MONTHLY_SUMMARY_TABLE's
+    daily table for the single selected `date` same as before the Month
+    filter existed; any real month instead queries MONTHLY_SUMMARY_TABLE's
     pre-aggregated rows for that PARTITIONCOL directly — a coarser,
-    separate data path, not just another way to express the same date range.
+    separate data path, not just another way to express the same date.
     """
     if month != ALL_VALUE:
         return fetch_month_funnel_steps(
@@ -337,8 +332,7 @@ def fetch_funnel_steps(
         journey=journey,
         platform=platform,
         version=version,
-        date_from=date_from,
-        date_to=date_to,
+        date=date,
     )
 
 
