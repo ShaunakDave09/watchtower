@@ -125,7 +125,7 @@ export default function FunnelDetailView({
       </div>
 
       <div className="grid grid-cols-[1fr_340px] gap-4">
-        <StagesTable stages={data.stages} />
+        <StagesTable stages={data.stages} funnelName={data.name} />
         <div className="flex flex-col gap-4">
           <DropoffReasons stageLabel={data.dropoffReasons.stageLabel} reasons={data.dropoffReasons.reasons} />
           <ConversionTrendChart points={data.trend} />
