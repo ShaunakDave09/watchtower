@@ -156,6 +156,21 @@ export function useFilters(dateRange?: DateRange) {
     ...(filters.month === ALL_FILTER_VALUE ? [{ cat: "Date", val: fmtShort(filters.date) }] : []),
   ];
 
+  // How many filters are actually narrowing the data, for the Filters
+  // button's badge — deliberately not chips.length. Business/Product/
+  // Sub-product/Platform always count: none of them has an "All"/neutral
+  // option, so whatever value they hold is always constraining the query.
+  // Journey/Version only count when picked away from ALL_FILTER_VALUE,
+  // their explicit "not filtering on this" state. The time dimension
+  // (Month vs. Date) always contributes exactly one: a real Month replaces
+  // Date as the active day-level constraint (see the chips list above), so
+  // there's always exactly one "when" filter in effect, never zero or two.
+  const appliedCount =
+    4 + // business, product, subProduct, platform
+    (filters.journey !== ALL_FILTER_VALUE ? 1 : 0) +
+    (filters.version !== ALL_FILTER_VALUE ? 1 : 0) +
+    1; // month (if real) or date (if month is "All") — always exactly one
+
   return {
     open,
     setOpen,
@@ -163,6 +178,7 @@ export function useFilters(dateRange?: DateRange) {
     set,
     jumpToDate,
     chips,
+    appliedCount,
     dateLabel: fmtShort(filters.date),
     monthLabel: `${MONTHS[viewMonth]} ${viewYear}`,
     days,

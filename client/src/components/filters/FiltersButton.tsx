@@ -12,7 +12,7 @@ export default function FiltersButton() {
       </svg>
       Filters
       <span className="rounded-full bg-[var(--color-accent)] px-[7px] py-[1px] font-mono text-[10.5px] leading-[1.5] text-white">
-        {filters.chips.length}
+        {filters.appliedCount}
       </span>
     </button>
   );
