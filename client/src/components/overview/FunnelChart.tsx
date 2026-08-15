@@ -128,13 +128,47 @@ export default function FunnelChart({
         {rows[rows.length - 1].step.users.toLocaleString()}
       </text>
 
-      <g fontFamily="'IBM Plex Sans',system-ui,sans-serif" fontSize={11.5} fontWeight={500} fill="var(--color-ink-soft)" textAnchor="end">
-        {rows.map((r) => (
-          <text key={r.step.step} x={108} y={r.y + 27}>
+      {/* foreignObject, not <text> — SVG text has no line-wrapping of its
+          own, so a long label just runs off the left edge of the viewBox
+          and gets silently clipped instead of rendering in full. A plain
+          HTML div here wraps normally with ordinary CSS.
+
+          `overflow: visible` on the foreignObject itself is load-bearing —
+          per the SVG UA stylesheet, foreignObject defaults to
+          `overflow: hidden`, so a wrapped label taller than one ROW_H would
+          otherwise still get clipped (symmetrically, since it's vertically
+          centered — the first *and* last lines would vanish). Letting it
+          overflow spills into ROW_GAP, the empty space already reserved
+          between rows for exactly this. */}
+      {rows.map((r) => (
+        <foreignObject
+          key={r.step.step}
+          x={0}
+          y={r.y}
+          width={108}
+          height={ROW_H}
+          style={{ overflow: "visible" }}
+        >
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "flex-end",
+              textAlign: "right",
+              fontFamily: "'IBM Plex Sans',system-ui,sans-serif",
+              fontSize: "11.5px",
+              fontWeight: 500,
+              lineHeight: 1.2,
+              color: "var(--color-ink-soft)",
+              overflowWrap: "break-word",
+            }}
+          >
             {r.step.label}
-          </text>
-        ))}
-      </g>
+          </div>
+        </foreignObject>
+      ))}
 
       {showDrop && (
         <g fontFamily="'IBM Plex Mono',ui-monospace,monospace" fontSize={11.5} fontWeight={600} fill="var(--color-danger)" textAnchor="start">
