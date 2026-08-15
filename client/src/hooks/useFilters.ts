@@ -45,6 +45,17 @@ function fmtShort(iso: string): string {
   return `${MONTHS[m - 1].slice(0, 3)} ${d}`;
 }
 
+// "YYYY-MM" -> "Mon YYYY" (e.g. "2026-08" -> "Aug 2026") for display —
+// exported so the filter modal's MONTH dropdown can format its options the
+// same way. ALL_FILTER_VALUE ("All") isn't a "YYYY-MM" string, so it just
+// passes through unchanged rather than matching and producing garbage.
+export function fmtMonth(value: string): string {
+  const match = /^(\d{4})-(\d{2})$/.exec(value);
+  if (!match) return value;
+  const [, y, m] = match;
+  return `${MONTHS[Number(m) - 1].slice(0, 3)} ${y}`;
+}
+
 // Plain string comparison is correct here — "YYYY-MM-DD" sorts identically
 // whether compared as strings or as dates, so no need to parse either side.
 function isOutsideRange(iso: string, range?: DateRange): boolean {
@@ -126,15 +137,23 @@ export function useFilters(dateRange?: DateRange) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewYear, viewMonth, filters.date, dateRange?.min, dateRange?.max]);
 
+  // Month and Date are mutually exclusive, not just visually redundant —
+  // picking a real month switches the backend to the monthly-summary query
+  // path entirely (see fetch_month_funnel_steps/fetch_funnel_steps in
+  // server/queries.py), which never looks at `date` at all. So once a
+  // month is selected, the Date chip isn't just extra noise, it's actively
+  // misleading (implying a day-level filter that no longer applies) —
+  // drop it from the active-filters list rather than show a value that
+  // doesn't do anything.
   const chips = [
     { cat: "Business", val: filters.business },
     { cat: "Product", val: filters.product },
     { cat: "Sub-product", val: filters.subProduct },
     { cat: "Journey", val: filters.journey },
     { cat: "Version", val: filters.version },
-    { cat: "Month", val: filters.month },
+    { cat: "Month", val: fmtMonth(filters.month) },
     { cat: "Platform", val: filters.platform },
-    { cat: "Date", val: fmtShort(filters.date) },
+    ...(filters.month === ALL_FILTER_VALUE ? [{ cat: "Date", val: fmtShort(filters.date) }] : []),
   ];
 
   return {
