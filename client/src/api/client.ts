@@ -74,8 +74,22 @@ export function fetchEntrypointSourceDetail(funnelId: string, sourceId: string):
   return getJson(`/api/funnels/${funnelId}/entrypoints/${sourceId}`);
 }
 
-export function fetchFunnelComparison(funnelId: string): Promise<ComparisonData> {
-  return getJson(`/api/funnels/${funnelId}/compare`);
+// Same filter set fetchFunnelDetail sends (minus `month` — this page
+// compares two single days for one filter combination, not a monthly
+// aggregate), plus `compare`, the currently active quick-compare pill label
+// the backend turns into the second date.
+export function fetchFunnelComparison(funnelId: string, filters: FilterState, compare: string): Promise<ComparisonData> {
+  const params = new URLSearchParams({
+    business: filters.business,
+    product: filters.product,
+    subProduct: filters.subProduct,
+    journey: filters.journey,
+    platform: filters.platform,
+    version: filters.version,
+    date: filters.date,
+    compare,
+  });
+  return getJson(`/api/funnels/${funnelId}/compare?${params}`);
 }
 
 export function fetchTrends(): Promise<TrendsData> {
