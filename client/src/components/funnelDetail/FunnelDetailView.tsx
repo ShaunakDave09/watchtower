@@ -130,8 +130,8 @@ export default function FunnelDetailView({
           <DropoffReasons stageLabel={data.dropoffReasons.stageLabel} reasons={data.dropoffReasons.reasons} />
           <ConversionTrendChart points={data.trend} />
           <ComparisonPanel
-            app={data.comparison.app}
-            web={data.comparison.web}
+            leftValue={data.comparison.app}
+            rightValue={data.comparison.web}
             calloutHtml={data.comparison.calloutHtml}
             rows={data.comparison.rows}
           />
