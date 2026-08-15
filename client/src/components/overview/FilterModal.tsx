@@ -1,4 +1,5 @@
 import { useFiltersContext } from "../../context/FiltersContext";
+import { fmtMonth } from "../../hooks/useFilters";
 import CalendarMonth from "./CalendarMonth";
 
 function FieldSelect({
@@ -6,11 +7,16 @@ function FieldSelect({
   value,
   options,
   onChange,
+  formatOption,
 }: {
   label: string;
   value: string;
   options: string[];
   onChange: (v: string) => void;
+  // Lets a field show a human-readable label (e.g. MONTH's "Aug 2026")
+  // while the <select>'s value — and everything set/onChange sees — stays
+  // the raw option string ("2026-08") the rest of the app expects.
+  formatOption?: (opt: string) => string;
 }) {
   return (
     <label className="block">
@@ -23,7 +29,9 @@ function FieldSelect({
         className="w-full cursor-pointer rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-card)] px-[10px] py-2 text-[13px] text-[var(--color-ink)]"
       >
         {options.map((opt) => (
-          <option key={opt}>{opt}</option>
+          <option key={opt} value={opt}>
+            {formatOption ? formatOption(opt) : opt}
+          </option>
         ))}
       </select>
     </label>
@@ -101,7 +109,13 @@ export default function FilterModal() {
               </div>
             </div>
 
-            <FieldSelect label="MONTH" value={filters.filters.month} options={options.month} onChange={(v) => filters.set("month", v)} />
+            <FieldSelect
+              label="MONTH"
+              value={filters.filters.month}
+              options={options.month}
+              onChange={(v) => filters.set("month", v)}
+              formatOption={fmtMonth}
+            />
 
             <div>
               <span className="mb-[5px] block font-mono text-[10px] tracking-[0.05em] text-[var(--color-muted)]">

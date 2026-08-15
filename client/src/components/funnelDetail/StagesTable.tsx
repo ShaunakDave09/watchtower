@@ -1,4 +1,5 @@
-import type { FunnelStep } from "../../api/types";
+import type { FunnelStep, FilterState } from "../../api/types";
+import { useFiltersContext } from "../../context/FiltersContext";
 
 // Simple RFC4180-ish escaping: only quote (and double-up embedded quotes)
 // when a field actually contains a comma, quote, or newline — labels here
@@ -8,14 +9,42 @@ function csvEscape(value: string): string {
   return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
-function stagesToCsv(stages: FunnelStep[]): string {
-  const header = ["Step", "Stage", "Users", "Conv %", "Drop %"];
+// Every row in the export describes the same funnel run, so the applied
+// filters are constant across rows, not per-stage data — they're appended
+// to each row anyway (rather than, say, a separate header block above the
+// table) so the file stays a single flat, spreadsheet-friendly grid.
+// Column names match the warehouse columns they came from (see
+// FILTER_COLUMNS in server/queries.py) rather than the filter modal's
+// display labels, since that's the vocabulary this CSV is meant to be
+// cross-referenced against.
+function stagesToCsv(stages: FunnelStep[], filters: FilterState): string {
+  const header = [
+    "Step",
+    "Stage",
+    "Users",
+    "Conv %",
+    "Drop %",
+    "BUSINESS",
+    "PRODUCT",
+    "SUB_PRODUCT",
+    "JOURNEY_NAME",
+    "ENTRYPOINT_STAGE",
+    "PLATFORM",
+    "DATE",
+  ];
   const rows = stages.map((s) => [
     String(s.step),
     s.label,
     String(s.users),
     String(s.convPct),
     s.dropPct === null ? "" : String(s.dropPct),
+    filters.business,
+    filters.product,
+    filters.subProduct,
+    filters.journey,
+    filters.version,
+    filters.platform,
+    filters.date,
   ]);
   return [header, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
 }
@@ -24,8 +53,8 @@ function stagesToCsv(stages: FunnelStep[]): string {
 // applied (FunnelDetail refetches it on every filter change), so exporting
 // it as-is exports exactly the filtered view the user is looking at —
 // nothing extra to thread through here.
-function downloadStagesCsv(stages: FunnelStep[], funnelName: string) {
-  const csv = stagesToCsv(stages);
+function downloadStagesCsv(stages: FunnelStep[], funnelName: string, filters: FilterState) {
+  const csv = stagesToCsv(stages, filters);
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const slug = funnelName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -39,13 +68,14 @@ function downloadStagesCsv(stages: FunnelStep[], funnelName: string) {
 }
 
 export default function StagesTable({ stages, funnelName = "funnel" }: { stages: FunnelStep[]; funnelName?: string }) {
+  const { filters } = useFiltersContext();
   return (
     <div className="overflow-x-auto rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] px-6 py-[22px]">
       <div className="mb-[14px] flex items-center gap-3">
         <div className="text-[15px] font-semibold text-[var(--color-ink)]">Funnel stages</div>
         <div className="flex-1" />
         <button
-          onClick={() => downloadStagesCsv(stages, funnelName)}
+          onClick={() => downloadStagesCsv(stages, funnelName, filters)}
           className="inline-flex items-center gap-[6px] rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-card)] px-[14px] py-[6px] text-[12px] font-medium text-[var(--color-body)] hover:bg-[var(--color-accent-soft)]"
         >
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
