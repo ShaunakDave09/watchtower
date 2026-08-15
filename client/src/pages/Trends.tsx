@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { fetchTrends } from "../api/client";
 import type { TrendsData } from "../api/types";
+import { useFiltersContext } from "../context/FiltersContext";
 import Panel from "../components/ui/Panel";
 import HourlyThroughputChart from "../components/trends/HourlyThroughputChart";
 import PacingChart from "../components/trends/PacingChart";
@@ -23,6 +24,7 @@ function LegendDot({ color, label, dashed = false }: { color: string; label: str
 }
 
 export default function Trends() {
+  const filters = useFiltersContext();
   const [data, setData] = useState<TrendsData | null>(null);
   const [range, setRange] = useState<"7d" | "30d" | "90d">("30d");
   const [error, setError] = useState<string | null>(null);
@@ -30,10 +32,14 @@ export default function Trends() {
 
   useEffect(() => {
     setError(null);
-    fetchTrends()
+    fetchTrends(filters.filters, range)
       .then(setData)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
-  }, [reloadKey]);
+    // Refetch whenever any active filter, the selected date, or the
+    // 7d/30d/90d range changes — same dependency shape as the other
+    // filter-driven pages (see FunnelDetail.tsx).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.filters, range, reloadKey]);
 
   if (error) {
     return <LoadError message={error} onRetry={() => setReloadKey((k) => k + 1)} />;

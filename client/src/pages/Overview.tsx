@@ -68,16 +68,25 @@ export default function Overview() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.filters, reloadKey]);
 
-  // Neither endpoint takes the global filters today (Trends' /api/trends is
-  // unparameterized; entrypoints are looked up by funnel id only — see
-  // their own pages), so there's nothing to depend on here beyond mount.
-  // Kept as a soft failure (logged, not surfaced via the page's LoadError):
-  // these two panels are a bonus on top of the main Overview data, not
-  // load-bearing for the page the way `data` is.
+  // /api/trends takes the same filters as everywhere else, but this panel
+  // only ever reads `pacing` off the response — hourly/pacing have no
+  // hour-of-day data to query yet (see get_trends), so they're always the
+  // same fixture values regardless of what's passed here. Still refetching
+  // on filter change for consistency with every other filter-driven call
+  // in the app, and in case pacing gets wired to something real later.
+  // Entrypoints are looked up by funnel id only (see EntrypointPerformance),
+  // so that one has nothing to depend on beyond mount. Both are kept as a
+  // soft failure (logged, not surfaced via the page's LoadError): these two
+  // panels are a bonus on top of the main Overview data, not load-bearing
+  // for the page the way `data` is.
   useEffect(() => {
-    fetchTrends()
+    fetchTrends(filters.filters, "30d")
       .then(setTrends)
       .catch((e) => console.error("Failed to load trends for Today's pacing panel", e));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.filters]);
+
+  useEffect(() => {
     fetchFunnelEntrypoints(OVERVIEW_FUNNEL_ID)
       .then(setEntrypoints)
       .catch((e) => console.error("Failed to load entrypoints for comparison panel", e));

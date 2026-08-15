@@ -92,8 +92,21 @@ export function fetchFunnelComparison(funnelId: string, filters: FilterState, co
   return getJson(`/api/funnels/${funnelId}/compare?${params}`);
 }
 
-export function fetchTrends(): Promise<TrendsData> {
-  return getJson("/api/trends");
+// Same filter set fetchFunnelDetail sends (minus `month` — this endpoint
+// has its own 7d/30d/90d range picker and always queries the daily table),
+// plus `range`, the currently selected window.
+export function fetchTrends(filters: FilterState, range: string): Promise<TrendsData> {
+  const params = new URLSearchParams({
+    business: filters.business,
+    product: filters.product,
+    subProduct: filters.subProduct,
+    journey: filters.journey,
+    platform: filters.platform,
+    version: filters.version,
+    date: filters.date,
+    range,
+  });
+  return getJson(`/api/trends?${params}`);
 }
 
 export function fetchAlerts(): Promise<AlertsData> {
