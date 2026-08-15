@@ -56,4 +56,21 @@ def get_funnel_detail(
     # being masked by the fixture.
     if stages is not None:
         data["stages"] = stages
+
+    # name/meta come from the fixture keyed on funnel_id, not on the
+    # filters actually applied — every funnel_id in practice falls back to
+    # the same "guest-checkout" entry (see funnels.get above), so without
+    # this the page would show "Guest Checkout funnel" and a hardcoded
+    # "13 stages · Payments → Checkout → Express Pay · v4.1" no matter what
+    # business/product/sub_product/version the user picked, and no matter
+    # how many stages the live query actually returned. Rebuild both from
+    # the same inputs that already produced `data["stages"]`, so the title,
+    # breadcrumb (derived from name on the frontend), and meta line always
+    # describe the funnel that's actually on screen.
+    final_conv_pct = data["stages"][-1]["convPct"] if data["stages"] else 0
+    data["name"] = f"{product} funnel"
+    data["meta"] = (
+        f"{len(data['stages'])} stages · {final_conv_pct}% conv · "
+        f"{business} → {product} → {sub_product} · {version}"
+    )
     return data
