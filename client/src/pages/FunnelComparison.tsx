@@ -2,12 +2,18 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { fetchFunnelComparison } from "../api/client";
 import type { ComparisonData } from "../api/types";
+import { useFiltersContext } from "../context/FiltersContext";
 import Panel from "../components/ui/Panel";
 import FunnelChart from "../components/overview/FunnelChart";
 import FiltersButton from "../components/filters/FiltersButton";
 import FilterBar from "../components/overview/FilterBar";
 import FilterModal from "../components/overview/FilterModal";
 import LoadError from "../components/ui/LoadError";
+
+// Matches the backend's own default (see get_funnel_comparison) so the
+// very first fetch — before the user's touched the quick-compare pills —
+// already asks for the same comparison the page renders as "active".
+const DEFAULT_QUICK_COMPARE = "Same day last month";
 
 function ComparisonKpiCard({
   label,
@@ -43,20 +49,23 @@ function ComparisonKpiCard({
 export default function FunnelComparison() {
   const { funnelId = "guest-checkout" } = useParams();
   const navigate = useNavigate();
+  const filters = useFiltersContext();
   const [data, setData] = useState<ComparisonData | null>(null);
-  const [activeQuickCompare, setActiveQuickCompare] = useState<string | null>(null);
+  const [compare, setCompare] = useState(DEFAULT_QUICK_COMPARE);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     setError(null);
-    fetchFunnelComparison(funnelId)
-      .then((d) => {
-        setData(d);
-        setActiveQuickCompare(d.activeQuickCompare);
-      })
+    fetchFunnelComparison(funnelId, filters.filters, compare)
+      .then(setData)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
-  }, [funnelId, reloadKey]);
+    // Refetch whenever any active filter, the selected date (dateA — dateB
+    // is derived from it server-side), or the chosen quick-compare pill
+    // changes — same dependency shape as Funnel Detail's fetch effect (see
+    // FunnelDetail.tsx).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [funnelId, filters.filters, compare, reloadKey]);
 
   if (error) {
     return <LoadError message={error} onRetry={() => setReloadKey((k) => k + 1)} />;
@@ -113,9 +122,9 @@ export default function FunnelComparison() {
         {data.quickCompare.map((opt) => (
           <button
             key={opt}
-            onClick={() => setActiveQuickCompare(opt)}
+            onClick={() => setCompare(opt)}
             className={`rounded-full px-[13px] py-[6px] text-[12px] font-medium transition-colors ${
-              opt === activeQuickCompare
+              opt === compare
                 ? "bg-[var(--color-accent)] text-white"
                 : "border border-[var(--color-border-strong)] bg-[var(--color-card)] text-[var(--color-body)] hover:bg-[var(--color-accent-soft)]"
             }`}
