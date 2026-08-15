@@ -68,21 +68,19 @@ export default function FilterModal() {
           </button>
         </div>
 
-        <div className="px-6 py-[22px]">
-          {/* 6 dropdowns divide evenly into two full rows of 3 — Platform
-              (a toggle, not a dropdown) and Date live in their own row
-              below instead of joining this grid as a 7th, unevenly-filled
-              cell. */}
-          <div className="grid grid-cols-3 gap-x-4 gap-y-[15px]">
+        <div className="grid grid-cols-[2fr_1fr] gap-4 px-6 py-[22px]">
+          {/* Left: every field (dropdowns, Platform's toggle, and the
+              selected-date readout) as an even 2-column, 4-row grid.
+              Right: the calendar itself, one column wide, stretching to
+              match this grid's full height (grid items stretch by
+              default) instead of a fixed-height box floating beside it. */}
+          <div className="grid grid-cols-2 gap-x-4 gap-y-[15px]">
             <FieldSelect label="BUSINESS" value={filters.filters.business} options={options.business} onChange={(v) => filters.set("business", v)} />
             <FieldSelect label="PRODUCT" value={filters.filters.product} options={options.product} onChange={(v) => filters.set("product", v)} />
             <FieldSelect label="SUB-PRODUCT" value={filters.filters.subProduct} options={options.subProduct} onChange={(v) => filters.set("subProduct", v)} />
             <FieldSelect label="JOURNEY" value={filters.filters.journey} options={options.journey} onChange={(v) => filters.set("journey", v)} />
             <FieldSelect label="VERSION" value={filters.filters.version} options={options.version} onChange={(v) => filters.set("version", v)} />
-            <FieldSelect label="MONTH" value={filters.filters.month} options={options.month} onChange={(v) => filters.set("month", v)} />
-          </div>
 
-          <div className="mt-[15px] grid grid-cols-2 gap-x-4">
             <div>
               <span className="mb-[5px] block font-mono text-[10px] tracking-[0.05em] text-[var(--color-muted)]">
                 PLATFORM
@@ -103,6 +101,8 @@ export default function FilterModal() {
               </div>
             </div>
 
+            <FieldSelect label="MONTH" value={filters.filters.month} options={options.month} onChange={(v) => filters.set("month", v)} />
+
             <div>
               <span className="mb-[5px] block font-mono text-[10px] tracking-[0.05em] text-[var(--color-muted)]">
                 DATE
@@ -113,7 +113,7 @@ export default function FilterModal() {
             </div>
           </div>
 
-          <div className="mx-auto mt-3 max-w-[340px] rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-card)] p-4">
+          <div className="flex flex-col justify-center rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-card)] p-4">
             <CalendarMonth
               label={filters.monthLabel}
               days={filters.days}
