@@ -68,50 +68,60 @@ export default function FilterModal() {
           </button>
         </div>
 
-        <div className="grid grid-cols-3 gap-x-4 gap-y-[15px] px-6 py-[22px]">
-          <FieldSelect label="BUSINESS" value={filters.filters.business} options={options.business} onChange={(v) => filters.set("business", v)} />
-          <FieldSelect label="PRODUCT" value={filters.filters.product} options={options.product} onChange={(v) => filters.set("product", v)} />
-          <FieldSelect label="SUB-PRODUCT" value={filters.filters.subProduct} options={options.subProduct} onChange={(v) => filters.set("subProduct", v)} />
-          <FieldSelect label="JOURNEY" value={filters.filters.journey} options={options.journey} onChange={(v) => filters.set("journey", v)} />
-          <FieldSelect label="VERSION" value={filters.filters.version} options={options.version} onChange={(v) => filters.set("version", v)} />
-          <FieldSelect label="MONTH" value={filters.filters.month} options={options.month} onChange={(v) => filters.set("month", v)} />
-          <div>
-            <span className="mb-[5px] block font-mono text-[10px] tracking-[0.05em] text-[var(--color-muted)]">
-              PLATFORM
-            </span>
-            <div className="flex gap-1 rounded-[9px] border border-[var(--color-border-strong)] bg-[var(--color-accent-chip)] p-[3px]">
-              <button
-                onClick={() => filters.set("platform", "App")}
-                className={`${segBase} ${filters.filters.platform === "App" ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-body)]"}`}
-              >
-                App
-              </button>
-              <button
-                onClick={() => filters.set("platform", "Web")}
-                className={`${segBase} ${filters.filters.platform === "Web" ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-body)]"}`}
-              >
-                Web
-              </button>
+        <div className="grid grid-cols-[2fr_1fr] gap-4 px-6 py-[22px]">
+          {/* Left: every field (dropdowns, Platform's toggle, and the
+              selected-date readout) as an even 2-column, 4-row grid.
+              Right: the calendar itself, one column wide, stretching to
+              match this grid's full height (grid items stretch by
+              default) instead of a fixed-height box floating beside it. */}
+          <div className="grid grid-cols-2 gap-x-4 gap-y-[15px]">
+            <FieldSelect label="BUSINESS" value={filters.filters.business} options={options.business} onChange={(v) => filters.set("business", v)} />
+            <FieldSelect label="PRODUCT" value={filters.filters.product} options={options.product} onChange={(v) => filters.set("product", v)} />
+            <FieldSelect label="SUB-PRODUCT" value={filters.filters.subProduct} options={options.subProduct} onChange={(v) => filters.set("subProduct", v)} />
+            <FieldSelect label="JOURNEY" value={filters.filters.journey} options={options.journey} onChange={(v) => filters.set("journey", v)} />
+            <FieldSelect label="VERSION" value={filters.filters.version} options={options.version} onChange={(v) => filters.set("version", v)} />
+
+            <div>
+              <span className="mb-[5px] block font-mono text-[10px] tracking-[0.05em] text-[var(--color-muted)]">
+                PLATFORM
+              </span>
+              <div className="flex gap-1 rounded-[9px] border border-[var(--color-border-strong)] bg-[var(--color-accent-chip)] p-[3px]">
+                <button
+                  onClick={() => filters.set("platform", "App")}
+                  className={`${segBase} ${filters.filters.platform === "App" ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-body)]"}`}
+                >
+                  App
+                </button>
+                <button
+                  onClick={() => filters.set("platform", "Web")}
+                  className={`${segBase} ${filters.filters.platform === "Web" ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-body)]"}`}
+                >
+                  Web
+                </button>
+              </div>
+            </div>
+
+            <FieldSelect label="MONTH" value={filters.filters.month} options={options.month} onChange={(v) => filters.set("month", v)} />
+
+            <div>
+              <span className="mb-[5px] block font-mono text-[10px] tracking-[0.05em] text-[var(--color-muted)]">
+                DATE
+              </span>
+              <div className="min-w-0 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-card)] px-[10px] py-[9px] font-mono text-[12px] text-[var(--color-ink)]">
+                {filters.dateLabel}
+              </div>
             </div>
           </div>
 
-          <div className="col-span-3">
-            <span className="mb-[5px] block font-mono text-[10px] tracking-[0.05em] text-[var(--color-muted)]">
-              DATE
-            </span>
-            <div className="mb-3 min-w-0 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-card)] px-[10px] py-[9px] font-mono text-[12px] text-[var(--color-ink)]">
-              {filters.dateLabel}
-            </div>
-            <div className="max-w-[280px] rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-card)] p-4">
-              <CalendarMonth
-                label={filters.monthLabel}
-                days={filters.days}
-                onPrev={filters.prevMonth}
-                onNext={filters.nextMonth}
-                canGoPrev={filters.canGoPrev}
-                canGoNext={filters.canGoNext}
-              />
-            </div>
+          <div className="flex flex-col justify-center rounded-xl border border-[var(--color-border-strong)] bg-[var(--color-card)] p-4">
+            <CalendarMonth
+              label={filters.monthLabel}
+              days={filters.days}
+              onPrev={filters.prevMonth}
+              onNext={filters.nextMonth}
+              canGoPrev={filters.canGoPrev}
+              canGoNext={filters.canGoNext}
+            />
           </div>
         </div>
 
