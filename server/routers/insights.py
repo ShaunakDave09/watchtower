@@ -219,7 +219,30 @@ _TREND_COLORS = [
     "#c9a68a",
 ]
 
-_RANGE_DAYS = {"7d": 7, "30d": 30, "90d": 90}
+def _build_stage_trend(daily: list[dict]) -> dict:
+    """One series per stage (not transition) — raw user counts reaching
+    that stage per day, for the Stage-wise trends chart. Same reference-
+    stage-order / zero-fill-if-missing reasoning as _build_conversion_trend,
+    just plotting volume instead of a conversion percentage.
+    """
+    reference_labels = [s["label"] for s in daily[-1]["steps"]]
+    dates = [_fmt_date_label(d["date"])[1] for d in daily]
+    per_day_users = [{s["label"]: s["users"] for s in d["steps"]} for d in daily]
+
+    series = []
+    for i, label in enumerate(reference_labels):
+        values = [day_users.get(label, 0) for day_users in per_day_users]
+        series.append(
+            {
+                "key": f"stage{i}",
+                "label": label,
+                "color": _TREND_COLORS[i % len(_TREND_COLORS)],
+                "values": values,
+                "endLabel": f"{values[-1]:,}",
+            }
+        )
+
+    return {"dates": dates, "series": series}
 
 
 def _build_conversion_trend(daily: list[dict]) -> dict:
@@ -279,8 +302,9 @@ def _build_conversion_trend(daily: list[dict]) -> dict:
 @router.get("/trends")
 def get_trends(
     # Same filter set Funnel Detail sends (minus `month` — this endpoint
-    # already has its own range picker, 7d/30d/90d, and always queries the
-    # daily table directly rather than switching to the monthly one).
+    # always queries the daily table directly rather than switching to the
+    # monthly one; there's no range picker anymore, see the window
+    # comment below).
     business: str = Query(...),
     product: str = Query(...),
     sub_product: str = Query(..., alias="subProduct"),
@@ -288,18 +312,24 @@ def get_trends(
     platform: str = Query(...),
     version: str = Query(...),
     date: str = Query(...),
-    range_: str = Query("30d", alias="range"),
 ) -> dict:
     data = json.loads((FIXTURES_DIR / "trends.json").read_text())
 
     # hourly/pacing stay on fixtures for now — there's no hour-of-day
     # granularity anywhere in the warehouse (HORIZONTAL_SUMMARY_TABLE is
     # daily, MONTHLY_SUMMARY_TABLE is monthly), so there's nothing real to
-    # back "Hourly throughput" or "Today's pacing" with yet.
-    days = _RANGE_DAYS.get(range_, 30)
+    # back "Hourly throughput", "Today's pacing", or an Hourly mode on the
+    # two daily trend charts below with yet — Hourly is disabled entirely
+    # on the frontend for those, rather than faked here.
+    #
+    # The daily window is fixed at the selected date +/- 15 days (31 days
+    # total) rather than a user-picked range: centering on the filter
+    # panel's own date keeps this consistent with every other page, which
+    # already treats that date as the anchor "today."
     y, m, d = (int(p) for p in date.split("-"))
-    end = date_cls(y, m, d)
-    start = end - timedelta(days=days - 1)
+    center = date_cls(y, m, d)
+    start = center - timedelta(days=15)
+    end = center + timedelta(days=15)
 
     try:
         daily = queries.fetch_conversion_trend(
@@ -317,14 +347,14 @@ def get_trends(
         daily = None
 
     # `daily` (not `is not None`) deliberately: an empty list means the
-    # query ran fine but matched nothing across the whole range, and
-    # there's no sensible reference stage list or date axis to build a
+    # query ran fine but matched nothing across the whole window, and
+    # there's no sensible reference stage list or date axis to build either
     # chart from in that case — same "nothing to compare against" reasoning
     # as the empty-one-side case in get_funnel_comparison, just with no
     # other side to fall back on here.
     if daily:
-        data["period"] = range_
         data["conversionTrend"] = _build_conversion_trend(daily)
+        data["stageTrend"] = _build_stage_trend(daily)
         _, short_start = _fmt_date_label(start.isoformat())
         _, short_end = _fmt_date_label(end.isoformat())
         data["subtitle"] = f"FUNNEL-WIDE + ENTRY-POINT TRENDS · {short_start.upper()} – {short_end.upper()}"

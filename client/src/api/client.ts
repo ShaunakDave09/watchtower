@@ -93,9 +93,9 @@ export function fetchFunnelComparison(funnelId: string, filters: FilterState, co
 }
 
 // Same filter set fetchFunnelDetail sends (minus `month` — this endpoint
-// has its own 7d/30d/90d range picker and always queries the daily table),
-// plus `range`, the currently selected window.
-export function fetchTrends(filters: FilterState, range: string): Promise<TrendsData> {
+// always queries the daily table). No range param: the backend fixes the
+// window at the selected date +/- 15 days on its own (see get_trends).
+export function fetchTrends(filters: FilterState): Promise<TrendsData> {
   const params = new URLSearchParams({
     business: filters.business,
     product: filters.product,
@@ -104,7 +104,6 @@ export function fetchTrends(filters: FilterState, range: string): Promise<Trends
     platform: filters.platform,
     version: filters.version,
     date: filters.date,
-    range,
   });
   return getJson(`/api/trends?${params}`);
 }

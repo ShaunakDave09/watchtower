@@ -232,6 +232,12 @@ export interface TrendsData {
     dates: string[];
     series: TrendSeries[];
   };
+  // Same shape as conversionTrend, but each series is a stage's raw daily
+  // user count instead of a conversion percentage to the next stage.
+  stageTrend: {
+    dates: string[];
+    series: TrendSeries[];
+  };
 }
 
 export interface AlertMetric {

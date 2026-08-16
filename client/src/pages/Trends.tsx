@@ -6,6 +6,8 @@ import Panel from "../components/ui/Panel";
 import HourlyThroughputChart from "../components/trends/HourlyThroughputChart";
 import PacingChart from "../components/trends/PacingChart";
 import ConversionTrendMultiLine from "../components/trends/ConversionTrendMultiLine";
+import DailyHourlyToggle from "../components/trends/DailyHourlyToggle";
+import SeriesMultiSelect from "../components/trends/SeriesMultiSelect";
 import FiltersButton from "../components/filters/FiltersButton";
 import FilterBar from "../components/overview/FilterBar";
 import FilterModal from "../components/overview/FilterModal";
@@ -23,23 +25,86 @@ function LegendDot({ color, label, dashed = false }: { color: string; label: str
   );
 }
 
+// Shared by both daily trend panels below: a title/subtitle on the left,
+// the series multi-select + Daily|Hourly toggle on the right, then the
+// chart itself — the only thing that differs between "Conversion rate
+// trend" and "Stage-wise trends" is which series set feeds it and what the
+// lines represent (a %, vs. a raw user count).
+function TrendPanel({
+  title,
+  subtitle,
+  dates,
+  allSeries,
+  selected,
+  onSelectedChange,
+}: {
+  title: string;
+  subtitle: string;
+  dates: string[];
+  allSeries: TrendsData["conversionTrend"]["series"];
+  selected: Set<string>;
+  onSelectedChange: (next: Set<string>) => void;
+}) {
+  const visibleSeries = allSeries.filter((s) => selected.has(s.key));
+  return (
+    <Panel className="p-[20px]">
+      <div className="mb-1 flex items-baseline gap-3">
+        <div className="text-[14px] font-semibold text-[var(--color-ink)]">{title}</div>
+        <div className="flex-1" />
+        <div className="flex items-center gap-[10px]">
+          <SeriesMultiSelect options={allSeries} selected={selected} onChange={onSelectedChange} />
+          <DailyHourlyToggle />
+        </div>
+      </div>
+      <div className="mb-3 flex items-center gap-[12px] font-mono text-[10px] text-[var(--color-faint)]">
+        <span>{subtitle}</span>
+        <div className="flex-1" />
+        <div className="flex flex-wrap items-center justify-end gap-[10px]">
+          {visibleSeries.map((s) => (
+            <span key={s.key} className="flex items-center gap-[5px]">
+              <span className="h-[7px] w-[7px] rounded-full" style={{ background: s.color }} />
+              {s.label}
+            </span>
+          ))}
+        </div>
+      </div>
+      {visibleSeries.length > 0 ? (
+        <ConversionTrendMultiLine dates={dates} series={visibleSeries} />
+      ) : (
+        <div className="flex h-[140px] items-center justify-center rounded-lg border border-dashed border-[var(--color-border-strong)] font-mono text-[12px] text-[var(--color-muted)]">
+          No series selected
+        </div>
+      )}
+    </Panel>
+  );
+}
+
 export default function Trends() {
   const filters = useFiltersContext();
   const [data, setData] = useState<TrendsData | null>(null);
-  const [range, setRange] = useState<"7d" | "30d" | "90d">("30d");
+  const [conversionSelected, setConversionSelected] = useState<Set<string>>(new Set());
+  const [stageSelected, setStageSelected] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     setError(null);
-    fetchTrends(filters.filters, range)
-      .then(setData)
+    fetchTrends(filters.filters)
+      .then((d) => {
+        setData(d);
+        // Default to showing every series — the multi-select narrows from
+        // there. Reseeded on every fetch since a filter/date change can
+        // return a different stage set entirely (see get_trends).
+        setConversionSelected(new Set(d.conversionTrend.series.map((s) => s.key)));
+        setStageSelected(new Set(d.stageTrend.series.map((s) => s.key)));
+      })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
-    // Refetch whenever any active filter, the selected date, or the
-    // 7d/30d/90d range changes — same dependency shape as the other
-    // filter-driven pages (see FunnelDetail.tsx).
+    // Refetch whenever any active filter or the selected date changes —
+    // same dependency shape as the other filter-driven pages (see
+    // FunnelDetail.tsx). The trend window itself is fixed (selected date
+    // +/- 15 days, see get_trends), not a user-picked range anymore.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.filters, range, reloadKey]);
+  }, [filters.filters, reloadKey]);
 
   if (error) {
     return <LoadError message={error} onRetry={() => setReloadKey((k) => k + 1)} />;
@@ -53,28 +118,7 @@ export default function Trends() {
       <div className="mb-1 flex items-start gap-4">
         <div className="text-[22px] font-semibold tracking-[-0.01em] text-[var(--color-ink)]">Trends</div>
         <div className="flex-1" />
-        <div className="flex items-center gap-2">
-          <FiltersButton />
-          <div className="flex gap-[3px] rounded-[9px] border border-[var(--color-border-strong)] bg-[var(--color-accent-chip)] p-[3px]">
-            {(
-              [
-                { key: "7d", label: "Last 7d" },
-                { key: "30d", label: "Last 30d" },
-                { key: "90d", label: "Last 90d" },
-              ] as const
-            ).map((opt) => (
-              <button
-                key={opt.key}
-                onClick={() => setRange(opt.key)}
-                className={`rounded-[7px] px-[14px] py-[7px] text-[12px] font-semibold transition-colors ${
-                  range === opt.key ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-body)] hover:bg-[var(--color-border)]/50"
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        <FiltersButton />
       </div>
 
       <FilterBar />
@@ -124,22 +168,24 @@ export default function Trends() {
         </Panel>
       </div>
 
-      <Panel className="p-[20px]">
-        <div className="mb-1 flex items-baseline gap-3">
-          <div className="text-[14px] font-semibold text-[var(--color-ink)]">Conversion rate trend</div>
-          <div className="flex-1" />
-          <div className="flex items-center gap-[12px]">
-            {data.conversionTrend.series.map((s) => (
-              <span key={s.key} className="flex items-center gap-[5px] font-mono text-[10px] text-[var(--color-faint)]">
-                <span className="h-[7px] w-[7px] rounded-full" style={{ background: s.color }} />
-                {s.label}
-              </span>
-            ))}
-          </div>
-        </div>
-        <div className="mb-3 font-mono text-[10px] text-[var(--color-faint)]">% OF ENTRANTS REACHING EACH STAGE, DAILY</div>
-        <ConversionTrendMultiLine dates={data.conversionTrend.dates} series={data.conversionTrend.series} />
-      </Panel>
+      <div className="flex flex-col gap-3">
+        <TrendPanel
+          title="Conversion rate trend"
+          subtitle="% OF ENTRANTS REACHING EACH STAGE, DAILY"
+          dates={data.conversionTrend.dates}
+          allSeries={data.conversionTrend.series}
+          selected={conversionSelected}
+          onSelectedChange={setConversionSelected}
+        />
+        <TrendPanel
+          title="Stage-wise trends"
+          subtitle="USERS REACHING EACH STAGE, DAILY"
+          dates={data.stageTrend.dates}
+          allSeries={data.stageTrend.series}
+          selected={stageSelected}
+          onSelectedChange={setStageSelected}
+        />
+      </div>
     </div>
   );
 }
