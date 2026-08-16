@@ -40,9 +40,25 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December",
 ];
 
-function fmtShort(iso: string): string {
+// "YYYY-MM-DD" -> "Mon D" (e.g. "2026-04-01" -> "Apr 1") — exported so
+// Today's-pacing-style "Today"/"Same time {date}" legends can format the
+// selected filter date the same way the date chip/picker already do.
+export function fmtShort(iso: string): string {
   const [, m, d] = iso.split("-").map(Number);
   return `${MONTHS[m - 1].slice(0, 3)} ${d}`;
+}
+
+// Calendar-correct day offset on an ISO "YYYY-MM-DD" string (handles
+// month/year boundaries, e.g. "2026-04-01" with days=-1 -> "2026-03-31") —
+// used to derive "yesterday" from the selected filter date. Local-time
+// Date arithmetic is fine here: these are calendar dates with no time-of-
+// day component to get confused by a timezone offset.
+export function shiftIsoDate(iso: string, days: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + days);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
 }
 
 // "YYYY-MM" -> "Mon YYYY" (e.g. "2026-08" -> "Aug 2026") for display —

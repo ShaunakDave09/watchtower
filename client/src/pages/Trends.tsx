@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { fetchTrends } from "../api/client";
 import type { TrendsData } from "../api/types";
 import { useFiltersContext } from "../context/FiltersContext";
+import { fmtShort, shiftIsoDate } from "../hooks/useFilters";
 import Panel from "../components/ui/Panel";
 import HourlyThroughputChart from "../components/trends/HourlyThroughputChart";
 import PacingChart from "../components/trends/PacingChart";
@@ -64,22 +65,37 @@ function TrendPanel({
           <DailyHourlyToggle value={granularity} onChange={onGranularityChange} />
         </div>
       </div>
-      <div className="mb-3 flex items-center gap-[12px] font-mono text-[10px] text-[var(--color-faint)]">
-        <span>
-          {subtitleBase}, {granularity.toUpperCase()}
-        </span>
-        <div className="flex-1" />
-        <div className="flex flex-wrap items-center justify-end gap-[10px]">
-          {visibleSeries.map((s) => (
-            <span key={s.key} className="flex items-center gap-[5px]">
-              <span className="h-[7px] w-[7px] rounded-full" style={{ background: s.color }} />
-              {s.label}
-            </span>
-          ))}
-        </div>
+      <div className="mb-3 font-mono text-[10px] text-[var(--color-faint)]">
+        {subtitleBase}, {granularity.toUpperCase()}
       </div>
       {visibleSeries.length > 0 ? (
-        <ConversionTrendMultiLine dates={dates} series={visibleSeries} />
+        // Series labels live in their own scrollable column to the right
+        // of the chart instead of a row above it — with up to ~13 series
+        // for a deep funnel, a wrapping row above the chart either grew
+        // tall enough to push the chart down or ran off the edge; a fixed-
+        // width column that scrolls its own overflow keeps the chart's
+        // height stable regardless of how many series are showing.
+        // `items-stretch` (the flex default) is what makes the legend
+        // column's height track the chart's actual rendered height rather
+        // than a guessed pixel value, since the SVG's own height is
+        // responsive to its container width.
+        <div className="flex items-stretch gap-4">
+          <div className="min-w-0 flex-1">
+            <ConversionTrendMultiLine dates={dates} series={visibleSeries} />
+          </div>
+          <div className="w-[170px] flex-none overflow-y-auto">
+            <div className="flex flex-col gap-[8px]">
+              {visibleSeries.map((s) => (
+                <div key={s.key} className="flex items-center gap-[6px] font-mono text-[10px] text-[var(--color-faint)]">
+                  <span className="h-[7px] w-[7px] flex-none rounded-full" style={{ background: s.color }} />
+                  <span className="truncate" title={s.label}>
+                    {s.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       ) : (
         <div className="flex h-[140px] items-center justify-center rounded-lg border border-dashed border-[var(--color-border-strong)] font-mono text-[12px] text-[var(--color-muted)]">
           No series selected
@@ -91,6 +107,8 @@ function TrendPanel({
 
 export default function Trends() {
   const filters = useFiltersContext();
+  const todayLabel = fmtShort(filters.filters.date);
+  const yesterdayLabel = fmtShort(shiftIsoDate(filters.filters.date, -1));
   const [data, setData] = useState<TrendsData | null>(null);
   const [conversionMode, setConversionMode] = useState<TrendGranularity>("daily");
   const [stageMode, setStageMode] = useState<TrendGranularity>("daily");
@@ -179,8 +197,8 @@ export default function Trends() {
           <div className="mb-3 font-mono text-[10px] text-[var(--color-faint)]">CONVERSION RATE THROUGH CURRENT HOUR</div>
           <PacingChart pacing={data.pacing} />
           <div className="mt-2 flex items-center gap-[14px]">
-            <LegendDot color="var(--color-accent)" label="Today" />
-            <LegendDot color="var(--color-faint)" label="Same time yesterday" dashed />
+            <LegendDot color="var(--color-accent)" label={todayLabel} />
+            <LegendDot color="var(--color-faint)" label={`Same time ${yesterdayLabel}`} dashed />
           </div>
           <div className="mt-4 flex items-baseline gap-[9px]">
             <span className="text-[26px] font-bold text-[var(--color-ink)]">{data.pacing.nowValue}%</span>

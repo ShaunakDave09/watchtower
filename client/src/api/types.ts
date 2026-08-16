@@ -98,6 +98,10 @@ export interface OverviewData {
   funnel: {
     title: string;
     convPct: string;
+    // `steps` is a preview — only the first 5 stages (STAGE_ORDER 0-4);
+    // `totalStages` is the real, full stage count so the "view full
+    // breakdown" link can say how many stages are actually behind it.
+    totalStages: number;
     steps: FunnelStep[];
   };
   retention: {

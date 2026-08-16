@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { fetchOverview, fetchTrends, fetchFunnelEntrypoints } from "../api/client";
 import type { ComparisonStageRow, EntrypointData, OverviewData, TrendsData } from "../api/types";
 import { useFiltersContext } from "../context/FiltersContext";
+import { fmtShort, shiftIsoDate } from "../hooks/useFilters";
 import KpiCard from "../components/overview/KpiCard";
 import FunnelChart from "../components/overview/FunnelChart";
 // import RetentionHeatmap from "../components/overview/RetentionHeatmap";
@@ -54,6 +55,8 @@ function buildEntrypointCallout(entrypoints: EntrypointData): string {
 export default function Overview() {
   const navigate = useNavigate();
   const filters = useFiltersContext();
+  const todayLabel = fmtShort(filters.filters.date);
+  const yesterdayLabel = fmtShort(shiftIsoDate(filters.filters.date, -1));
   const [data, setData] = useState<OverviewData | null>(null);
   const [trends, setTrends] = useState<TrendsData | null>(null);
   const [entrypoints, setEntrypoints] = useState<EntrypointData | null>(null);
@@ -138,7 +141,9 @@ export default function Overview() {
               silently hid the bottom of the funnel instead of letting the
               panel scroll to it. */}
           <FunnelChart steps={data.funnel.steps} />
-          <div className="mt-1 font-mono text-[11px] text-[var(--color-faint)]">Click to view full 13-stage breakdown →</div>
+          <div className="mt-1 font-mono text-[11px] text-[var(--color-faint)]">
+            Click to view full {data.funnel.totalStages}-stage breakdown →
+          </div>
         </Panel>
 
         <div className="flex min-h-0 flex-col gap-3 overflow-y-auto">
@@ -163,11 +168,11 @@ export default function Overview() {
                 <div className="mt-2 flex items-center gap-[14px]">
                   <span className="flex items-center gap-[6px] font-mono text-[10px] text-[var(--color-faint)]">
                     <span className="inline-block h-[2px] w-[12px]" style={{ background: "var(--color-accent)" }} />
-                    Today
+                    {todayLabel}
                   </span>
                   <span className="flex items-center gap-[6px] font-mono text-[10px] text-[var(--color-faint)]">
                     <span className="inline-block h-[2px] w-[12px]" style={{ borderTop: "2px dashed var(--color-faint)" }} />
-                    Same time yesterday
+                    Same time {yesterdayLabel}
                   </span>
                 </div>
                 <div className="mt-3 flex items-baseline gap-[9px]">

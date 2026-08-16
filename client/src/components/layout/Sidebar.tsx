@@ -97,8 +97,17 @@ export default function Sidebar() {
 
   return (
     <div
-      className={`sticky top-0 flex h-screen ${collapsed ? "w-[72px]" : "w-[270px]"} flex-none flex-col self-start overflow-y-auto rounded-[12px] border-r border-[var(--color-border)] bg-[var(--color-card)] px-[14px] py-[18px] transition-[width] duration-200`}
+      className={`sticky top-0 flex h-screen ${collapsed ? "w-[72px]" : "w-[270px]"} flex-none flex-col self-start rounded-[12px] border-r border-[var(--color-border)] bg-[var(--color-card)] px-[14px] py-[18px] transition-[width] duration-200`}
     >
+      {/* No overflow-y-auto here: setting overflow-y alone forces the
+          browser to compute overflow-x as "auto" too (CSS's overflow
+          longhands are dependent that way), and the collapse toggle button
+          below intentionally sits 12px outside this container's right edge
+          (`-right-3`) — that combination is exactly what produced an
+          unwanted horizontal scrollbar. AppShell's own h-screen/
+          overflow-hidden shell (plus the content pane's overflow-y-auto)
+          already keeps this sidebar from scrolling with page content, so
+          nothing here needs its own vertical scroll too. */}
       <button
         onClick={() => setCollapsed((c) => !c)}
         title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
