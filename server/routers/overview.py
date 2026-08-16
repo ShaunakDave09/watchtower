@@ -13,6 +13,14 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["overview"])
 
+# Overview's funnel panel is a compact preview, not the full funnel — it
+# only ever shows the first 5 stages (STAGE_ORDER 0-4). Kept as one constant
+# here rather than a hardcoded slice so "which stages count as the preview"
+# is visible in a single place and passed straight into the query (see
+# fetch_funnel_steps's stage_orders) instead of being applied by slicing
+# the full result list in Python.
+FIRST_STAGES = [0, 1, 2, 3, 4]
+
 
 @router.get("/filters")
 def get_filters(
@@ -160,20 +168,34 @@ def get_overview(
             opportunity = _build_opportunity(steps)
             if opportunity:
                 data["opportunity"] = opportunity
-
-        # Overview's funnel panel is a compact preview, not the full
-        # funnel — only STAGE_ORDER 0-4 (the first 5 stages) are charted
-        # here; the full breakdown is one click away on Funnel Detail
-        # (get_funnel_detail), which deliberately doesn't apply this
-        # truncation. `steps` is already ordered by STAGE_ORDER (see
-        # fetch_overview_funnel_steps/fetch_month_funnel_steps), so slicing
-        # the first 5 is equivalent to filtering STAGE_ORDER IN (0,1,2,3,4)
-        # without a second query. convPct is taken from *this* slice's own
-        # last stage so the "conv" badge next to the chart always matches
-        # what the chart actually ends on, not the true end-to-end number.
-        visible_steps = steps[:5]
-        data["funnel"]["steps"] = visible_steps
         data["funnel"]["totalStages"] = len(steps)
+
+        # The panel itself re-queries with stage_orders=FIRST_STAGES rather
+        # than slicing `steps` here — the `WHERE "STAGE_ORDER" IN (0,1,2,3,4)`
+        # restriction lives in the query (server/queries.py), not in this
+        # app code, so the DB is the source of truth for which stages the
+        # preview shows. The full breakdown is still one click away on
+        # Funnel Detail (get_funnel_detail), which never passes stage_orders.
+        # convPct is taken from *this* slice's own last stage so the "conv"
+        # badge next to the chart always matches what the chart actually
+        # ends on, not the true end-to-end number.
+        try:
+            visible_steps = queries.fetch_funnel_steps(
+                business=business,
+                product=product,
+                sub_product=sub_product,
+                journey=journey,
+                platform=platform,
+                version=version,
+                month=month,
+                date=date,
+                stage_orders=FIRST_STAGES,
+            )
+        except Exception:
+            logger.exception("fetch_funnel_steps (stage_orders-filtered) failed, using full-funnel slice")
+            visible_steps = steps[:5]
+
+        data["funnel"]["steps"] = visible_steps
         if visible_steps:
             data["funnel"]["convPct"] = f"{visible_steps[-1]['convPct']}%"
     return data

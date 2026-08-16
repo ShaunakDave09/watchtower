@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useRef, useEffect, useState } from "react";
 import { fetchTrends } from "../api/client";
 import type { TrendsData } from "../api/types";
 import { useFiltersContext } from "../context/FiltersContext";
@@ -14,6 +14,44 @@ import FiltersButton from "../components/filters/FiltersButton";
 import FilterBar from "../components/overview/FilterBar";
 import FilterModal from "../components/overview/FilterModal";
 import LoadError from "../components/ui/LoadError";
+
+// Measures an element's actual rendered height and keeps it in sync as the
+// element resizes (e.g. the window narrowing, which changes the chart
+// SVG's height since it scales with its container's width via viewBox).
+// TrendPanel uses this on the chart wrapper so the legend column next to it
+// can be pinned to that exact pixel height via `maxHeight` — a plain
+// flexbox `items-stretch` isn't enough here: stretch derives the row's
+// height from the *tallest* child's own natural content size, so a legend
+// list with many rows would just grow the whole row (and the chart with
+// it) to fit every label instead of ever actually engaging its
+// `overflow-y-auto` scrollbar.
+//
+// A callback ref (not a plain useRef + a mount-only useEffect) is what
+// makes this actually work: the chart wrapper this measures only exists in
+// the DOM once at least one series is selected ("No series selected" renders
+// in its place otherwise), and `selected` starts as an empty Set that a
+// separate effect populates asynchronously right after data loads — so the
+// chart div doesn't exist yet on TrendPanel's first mount. A plain ref's
+// mount-only effect would see `ref.current === null` at that point and
+// never re-run once the div actually appears a render later. A callback ref
+// fires every time React attaches (or detaches) the DOM node, so it
+// correctly (re)attaches the observer whenever the chart div comes and goes.
+function useElementHeight<T extends HTMLElement>() {
+  const [height, setHeight] = useState<number | null>(null);
+  const observerRef = useRef<ResizeObserver | null>(null);
+  const ref = useCallback((el: T | null) => {
+    observerRef.current?.disconnect();
+    observerRef.current = null;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const h = entries[0]?.contentRect.height;
+      if (h) setHeight(h);
+    });
+    observer.observe(el);
+    observerRef.current = observer;
+  }, []);
+  return [ref, height] as const;
+}
 
 function LegendDot({ color, label, dashed = false }: { color: string; label: string; dashed?: boolean }) {
   return (
@@ -55,6 +93,7 @@ function TrendPanel({
   onSelectedChange: (next: Set<string>) => void;
 }) {
   const visibleSeries = allSeries.filter((s) => selected.has(s.key));
+  const [chartRef, chartHeight] = useElementHeight<HTMLDivElement>();
   return (
     <Panel className="p-[20px]">
       <div className="mb-1 flex items-baseline gap-3">
@@ -75,15 +114,18 @@ function TrendPanel({
         // tall enough to push the chart down or ran off the edge; a fixed-
         // width column that scrolls its own overflow keeps the chart's
         // height stable regardless of how many series are showing.
-        // `items-stretch` (the flex default) is what makes the legend
-        // column's height track the chart's actual rendered height rather
-        // than a guessed pixel value, since the SVG's own height is
-        // responsive to its container width.
-        <div className="flex items-stretch gap-4">
-          <div className="min-w-0 flex-1">
+        // The legend's `maxHeight` is pinned to the chart's own measured
+        // height (via useElementHeight + ResizeObserver on the chart
+        // wrapper) rather than left to `items-stretch`: stretch alone would
+        // just grow the whole row — chart included — to fit every label
+        // instead of ever letting the legend's overflow-y-auto actually
+        // scroll. `items-start` keeps the chart from being stretched to
+        // match the (now independently capped) legend column.
+        <div className="flex items-start gap-4">
+          <div ref={chartRef} className="min-w-0 flex-1">
             <ConversionTrendMultiLine dates={dates} series={visibleSeries} />
           </div>
-          <div className="w-[170px] flex-none overflow-y-auto">
+          <div className="w-[170px] flex-none overflow-y-auto" style={{ maxHeight: chartHeight ?? 200 }}>
             <div className="flex flex-col gap-[8px]">
               {visibleSeries.map((s) => (
                 <div key={s.key} className="flex items-center gap-[6px] font-mono text-[10px] text-[var(--color-faint)]">

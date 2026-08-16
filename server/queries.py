@@ -174,6 +174,7 @@ def fetch_month_funnel_steps(
     platform: str,
     version: str,
     month: str,
+    stage_orders: Optional[list[int]] = None,
 ) -> list[dict]:
     """Same dimension filtering as fetch_overview_funnel_steps, but
     aggregates MONTHLY_SUMMARY_TABLE's pre-computed monthly rows for a
@@ -188,6 +189,12 @@ def fetch_month_funnel_steps(
     exact `=` would silently drop rows a human would consider the same
     value. coalesce(..., 'APP') on EP_PLATFORM treats a null platform as
     App rather than excluding the row entirely.
+
+    stage_orders, when given, restricts the result to just those STAGE_ORDER
+    values (e.g. Overview's 5-stage funnel preview) via the DB query itself
+    rather than fetching every stage and slicing the list in Python — so
+    "which stages count as the preview" lives in one query parameter, not
+    duplicated app-side logic.
 
     The query is built directly here rather than through a shared predicate
     helper — journey/version are the only two parts of the WHERE clause
@@ -220,6 +227,10 @@ def fetch_month_funnel_steps(
     if version != ALL_VALUE:
         query += """
           AND upper("ENTRYPOINT_STAGE") = upper(%(version)s)"""
+    if stage_orders is not None:
+        query += """
+          AND "STAGE_ORDER" = ANY(%(stage_orders)s)"""
+        params["stage_orders"] = list(stage_orders)
     query += """
         GROUP BY "STAGE_ORDER", "STAGE_NAMES"
         ORDER BY "STAGE_ORDER"
@@ -244,11 +255,14 @@ def fetch_overview_funnel_steps(
     platform: str,
     version: str,
     date: str,
+    stage_orders: Optional[list[int]] = None,
 ) -> list[dict]:
     """Same reasoning as fetch_month_funnel_steps (upper() everywhere,
-    coalesce on platform, journey/version dropped entirely on "All") —
-    aggregates the daily table for a single calendar day instead of a
-    PARTITIONCOL (the filter panel picks one date, not a range).
+    coalesce on platform, journey/version dropped entirely on "All",
+    stage_orders restricting to specific STAGE_ORDER values in SQL rather
+    than in Python) — aggregates the daily table for a single calendar day
+    instead of a PARTITIONCOL (the filter panel picks one date, not a
+    range).
     """
     params = {
         "business": business.upper(),
@@ -274,6 +288,10 @@ def fetch_overview_funnel_steps(
     if version != ALL_VALUE:
         query += """
           AND upper("ENTRYPOINT_STAGE") = upper(%(version)s)"""
+    if stage_orders is not None:
+        query += """
+          AND "STAGE_ORDER" = ANY(%(stage_orders)s)"""
+        params["stage_orders"] = list(stage_orders)
     query += """
         GROUP BY "STAGE_ORDER", "STAGE_NAMES"
         ORDER BY "STAGE_ORDER"
@@ -492,6 +510,7 @@ def fetch_funnel_steps(
     version: str,
     month: str,
     date: str,
+    stage_orders: Optional[list[int]] = None,
 ) -> list[dict]:
     """Single entry point for both Overview's funnel chart and Funnel
     Detail's stage table — they're the exact same aggregation, grouped by
@@ -502,6 +521,12 @@ def fetch_funnel_steps(
     filter existed; any real month instead queries MONTHLY_SUMMARY_TABLE's
     pre-aggregated rows for that PARTITIONCOL directly — a coarser,
     separate data path, not just another way to express the same date.
+
+    stage_orders is threaded straight through to whichever of the two
+    underlying queries actually runs, so callers (Overview's 5-stage
+    preview) get the restriction applied in SQL regardless of which data
+    path (daily vs. monthly) a given request resolves to. Funnel Detail
+    never passes it, so it keeps seeing every stage.
     """
     if month != ALL_VALUE:
         return fetch_month_funnel_steps(
@@ -512,6 +537,7 @@ def fetch_funnel_steps(
             platform=platform,
             version=version,
             month=month,
+            stage_orders=stage_orders,
         )
     return fetch_overview_funnel_steps(
         business=business,
@@ -521,6 +547,7 @@ def fetch_funnel_steps(
         platform=platform,
         version=version,
         date=date,
+        stage_orders=stage_orders,
     )
 
 
