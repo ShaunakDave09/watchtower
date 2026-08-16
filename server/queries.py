@@ -24,6 +24,14 @@ MONTHLY_SUMMARY_TABLE = os.environ.get(
     "MONTHLY_SUMMARY_TABLE", "digital360.business_funnel_monthly"
 )
 
+# Same dimension columns and grain as HORIZONTAL_SUMMARY_TABLE, plus one
+# more: an "HOUR" column (0-23). Backs every hour-of-day view on the Trends
+# page (Hourly throughput, Today's pacing, and Hourly mode on the two daily
+# trend charts) — none of that existed for real until this table did.
+HOURLY_SUMMARY_TABLE = os.environ.get(
+    "HOURLY_SUMMARY_TABLE", "digital360.hourly_summary"
+)
+
 # Sentinel for "don't filter on this field" — only offered for Journey and
 # Version. Unlike business/product/sub_product (which narrow which data
 # exists at all and always need a real pick), journey and version are
@@ -295,7 +303,8 @@ def fetch_conversion_trend(
 ) -> list[dict]:
     """Same dimension filtering as fetch_overview_funnel_steps, but grouped
     by DATE too and over an inclusive date range instead of a single day —
-    backs Trends' conversion-rate-trend chart (the 7d/30d/90d range picker).
+    backs the Daily mode of Trends' two trend charts (selected date +/- 15
+    days).
 
     One day can genuinely have data for some stages and not others (e.g. a
     stage nobody reached that day just has no matching rows at all — there's
@@ -347,6 +356,72 @@ def fetch_conversion_trend(
         iso_date = _from_table_date(str(row["DATE"]))
         by_date.setdefault(iso_date, []).append({"label": row["STAGE_NAMES"], "users": row["users"]})
     return [{"date": d, "steps": steps} for d, steps in sorted(by_date.items())]
+
+
+def fetch_hourly_funnel_steps(
+    *,
+    business: str,
+    product: str,
+    sub_product: str,
+    journey: str,
+    platform: str,
+    version: str,
+    start_date: str,
+    end_date: str,
+) -> list[dict]:
+    """Same dimension filtering (and the same day-can-be-partial reasoning)
+    as fetch_conversion_trend, but grouped by HOUR too and read from
+    HOURLY_SUMMARY_TABLE instead of the daily table — backs every
+    hour-of-day view on the Trends page. A single call covering the
+    selected date and the 7 days before it is enough to build all of them:
+    the selected date's own (date, hour) buckets back Hourly throughput,
+    Hourly mode on the two trend charts, and "today" in Today's pacing; the
+    other 7 days back "yesterday" and the trailing-7-day-same-hour band.
+    """
+    params = {
+        "business": business.upper(),
+        "product": product.upper(),
+        "sub_product": sub_product.upper(),
+        "journey": journey.upper(),
+        "platform": platform.upper(),
+        "version": version.upper(),
+        "start_date": _to_table_date(start_date),
+        "end_date": _to_table_date(end_date),
+    }
+
+    query = f"""
+        SELECT "DATE", "HOUR", "STAGE_ORDER", "STAGE_NAMES", SUM(users) AS users
+        FROM {HOURLY_SUMMARY_TABLE}
+        WHERE upper("BUSINESS") = upper(%(business)s)
+          AND upper("PRODUCT") = upper(%(product)s)
+          AND upper("SUB_PRODUCT") = upper(%(sub_product)s)
+          AND coalesce(upper("EP_PLATFORM"), 'APP') = upper(%(platform)s)
+          AND "DATE" BETWEEN %(start_date)s AND %(end_date)s"""
+    if journey != ALL_VALUE:
+        query += """
+          AND upper("Journey_name") = upper(%(journey)s)"""
+    if version != ALL_VALUE:
+        query += """
+          AND upper("ENTRYPOINT_STAGE") = upper(%(version)s)"""
+    query += """
+        GROUP BY "DATE", "HOUR", "STAGE_ORDER", "STAGE_NAMES"
+        ORDER BY "DATE", "HOUR", "STAGE_ORDER"
+    """
+
+    pool = db.get_connection()
+    with pool.connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(query, params)
+            rows = cur.fetchall()
+    if not rows:
+        logger.error("fetch_hourly_funnel_steps matched 0 rows for params=%r", params)
+        return []
+
+    by_bucket: dict[tuple[str, int], list[dict]] = {}
+    for row in rows:
+        key = (_from_table_date(str(row["DATE"])), int(row["HOUR"]))
+        by_bucket.setdefault(key, []).append({"label": row["STAGE_NAMES"], "users": row["users"]})
+    return [{"date": d, "hour": h, "steps": steps} for (d, h), steps in sorted(by_bucket.items())]
 
 
 def _diagnose_empty_overview_result(params: dict, journey: str, version: str) -> None:

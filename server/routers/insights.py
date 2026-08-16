@@ -219,19 +219,33 @@ _TREND_COLORS = [
     "#c9a68a",
 ]
 
-def _build_stage_trend(daily: list[dict]) -> dict:
+def _fmt_hour_label(hour: int) -> str:
+    """0 -> "12am", 14 -> "2pm" — mirrors PacingChart.tsx's own hourLabel()
+    so backend- and frontend-formatted hours never disagree."""
+    h = 12 if hour % 12 == 0 else hour % 12
+    return f"{h}{'am' if hour < 12 else 'pm'}"
+
+
+def _build_stage_trend(buckets: list[dict], labels: list[str]) -> dict:
     """One series per stage (not transition) — raw user counts reaching
-    that stage per day, for the Stage-wise trends chart. Same reference-
-    stage-order / zero-fill-if-missing reasoning as _build_conversion_trend,
-    just plotting volume instead of a conversion percentage.
+    that stage per bucket, for the Stage-wise trends chart. `buckets` is
+    either fetch_conversion_trend's per-day output (Daily mode) or
+    fetch_hourly_funnel_steps' per-hour output for a single day (Hourly
+    mode) — both are `[{"steps": [...]}, ...]` in chronological order, so
+    the same builder works for either; `labels` carries whatever axis text
+    (dates or hour-of-day strings) matches that ordering.
+
+    Same reference-stage-order / zero-fill-if-missing reasoning either way:
+    the *reference* stage order is the most recent bucket's stage list, and
+    a bucket missing one of those stages entirely (no rows, not a real
+    zero) contributes 0 users for it — real information, not a gap.
     """
-    reference_labels = [s["label"] for s in daily[-1]["steps"]]
-    dates = [_fmt_date_label(d["date"])[1] for d in daily]
-    per_day_users = [{s["label"]: s["users"] for s in d["steps"]} for d in daily]
+    reference_labels = [s["label"] for s in buckets[-1]["steps"]]
+    per_bucket_users = [{s["label"]: s["users"] for s in b["steps"]} for b in buckets]
 
     series = []
     for i, label in enumerate(reference_labels):
-        values = [day_users.get(label, 0) for day_users in per_day_users]
+        values = [bucket_users.get(label, 0) for bucket_users in per_bucket_users]
         series.append(
             {
                 "key": f"stage{i}",
@@ -242,31 +256,25 @@ def _build_stage_trend(daily: list[dict]) -> dict:
             }
         )
 
-    return {"dates": dates, "series": series}
+    return {"dates": labels, "series": series}
 
 
-def _build_conversion_trend(daily: list[dict]) -> dict:
+def _build_conversion_trend(buckets: list[dict], labels: list[str]) -> dict:
     """One series per adjacent stage-to-stage transition, plus one overall
     first-stage-to-last-stage series — every real transition, per the
     "matches the original spirit most closely" choice over a fixed 1-2-line
     chart, since a real deep funnel can have many more than the fixture's 4
-    stages.
-
-    The *reference* stage order is the most recent day's stage list (best
-    guess at the combination's current shape). A day missing one of those
-    stages entirely (fetch_conversion_trend only returns stages that
-    actually had rows) contributes 0 users for it that day — real
-    information (nobody reached it), not a gap in the line.
+    stages. See _build_stage_trend for what `buckets`/`labels` are (Daily
+    vs. Hourly mode both flow through here the same way).
     """
-    reference_labels = [s["label"] for s in daily[-1]["steps"]]
-    dates = [_fmt_date_label(d["date"])[1] for d in daily]
-    per_day_users = [{s["label"]: s["users"] for s in d["steps"]} for d in daily]
+    reference_labels = [s["label"] for s in buckets[-1]["steps"]]
+    per_bucket_users = [{s["label"]: s["users"] for s in b["steps"]} for b in buckets]
 
     def transition_values(prev_label: str, cur_label: str) -> list[float]:
         values = []
-        for day_users in per_day_users:
-            prev_users = day_users.get(prev_label, 0)
-            cur_users = day_users.get(cur_label, 0)
+        for bucket_users in per_bucket_users:
+            prev_users = bucket_users.get(prev_label, 0)
+            cur_users = bucket_users.get(cur_label, 0)
             values.append(round(cur_users / prev_users * 100, 1) if prev_users else 0.0)
         return values
 
@@ -296,7 +304,117 @@ def _build_conversion_trend(daily: list[dict]) -> dict:
             }
         )
 
-    return {"dates": dates, "series": series}
+    return {"dates": labels, "series": series}
+
+
+def _step_conv_pct(steps: list[dict]) -> float:
+    """End-to-end conversion % for one bucket's step list (last stage's
+    users as a % of the first) — 0 for an empty or all-zero-first-stage
+    bucket rather than dividing by zero."""
+    if not steps:
+        return 0.0
+    first = steps[0]["users"]
+    return round(steps[-1]["users"] / first * 100, 1) if first else 0.0
+
+
+def _build_hourly_throughput(today_buckets: list[dict], band_by_hour: dict[int, list[float]]) -> dict:
+    """entrants/convRate for each hour of the selected date that actually
+    has data, plus an expected [low, high] band per hour — the min/max
+    conv% seen at that same hour across the trailing 7 days
+    (`band_by_hour`, built by the caller from the rest of the 8-day
+    fetch). A day that isn't fully "over" yet just ends up with fewer
+    entries in every array — same "only real buckets" reasoning as
+    everywhere else on this page, and HourlyThroughputChart already treats
+    the last bar as "Now" regardless of how many bars there are.
+    """
+    hours = [b["hour"] for b in today_buckets]
+    entrants = [b["steps"][0]["users"] if b["steps"] else 0 for b in today_buckets]
+    conv_rate = [_step_conv_pct(b["steps"]) for b in today_buckets]
+    expected_low = []
+    expected_high = []
+    for h, cr in zip(hours, conv_rate):
+        band = band_by_hour.get(h)
+        # No trailing data at all for this hour (e.g. a brand-new filter
+        # combo) -> collapse the band to the current value instead of
+        # crashing on min()/max() of an empty list.
+        expected_low.append(min(band) if band else cr)
+        expected_high.append(max(band) if band else cr)
+
+    last_label = _fmt_hour_label(hours[-1]) if hours else "12am"
+    return {
+        "liveLabel": f"THROUGH {last_label.upper()}",
+        "tickLabels": ["12am", "4am", "8am", "12pm", "4pm", "8pm", "Now"],
+        "entrants": entrants,
+        "convRate": conv_rate,
+        "expectedLow": expected_low,
+        "expectedHigh": expected_high,
+        "alertHtml": _build_hourly_alert(conv_rate, expected_low),
+    }
+
+
+def _build_hourly_alert(conv_rate: list[float], expected_low: list[float]) -> Optional[str]:
+    """Red-banner alert text when the last 3 real hours have all come in
+    under that hour's own expected-low bound — None (no banner at all)
+    otherwise, rather than showing a box with nothing wrong to report."""
+    if len(conv_rate) < 3:
+        return None
+    last3, low3 = conv_rate[-3:], expected_low[-3:]
+    if not all(last3[i] < low3[i] for i in range(3)):
+        return None
+    avg_low = round(sum(low3) / 3, 1)
+    return (
+        f"Conversion rate has been below the last 7d avg for the last <strong>3 hours</strong> "
+        f"— down to <strong>{last3[-1]:g}%</strong> vs. a ~{avg_low:g}% average."
+    )
+
+
+def _project_remaining_hours(today_conv: list[float], current_hour: int) -> list[float]:
+    """Naive trend projection for the hours of the day that haven't
+    happened yet: extends the average hour-over-hour change from the last
+    few real hours forward, clamped to [0, 100]. Good enough for "trending
+    toward ~X% by end of day" — not a real forecasting model, same spirit
+    as the rest of this endpoint's derived numbers."""
+    remaining = 23 - current_hour
+    if remaining <= 0 or not today_conv:
+        return []
+    window = today_conv[-4:] if len(today_conv) >= 4 else today_conv
+    slope = (window[-1] - window[0]) / (len(window) - 1) if len(window) >= 2 else 0.0
+    values = []
+    last = today_conv[-1]
+    for _ in range(remaining):
+        last = max(0.0, min(100.0, last + slope))
+        values.append(round(last, 1))
+    return values
+
+
+def _build_pacing(today_buckets: list[dict], yesterday_buckets: list[dict]) -> dict:
+    """Today vs. yesterday's hour-by-hour end-to-end conversion, plus a
+    projection for the rest of today — backs the "Today's pacing" panel.
+    """
+    today_conv = [_step_conv_pct(b["steps"]) for b in today_buckets]
+    yesterday_conv = [_step_conv_pct(b["steps"]) for b in yesterday_buckets]
+    current_hour = today_buckets[-1]["hour"] if today_buckets else 0
+    now_value = today_conv[-1] if today_conv else 0.0
+
+    if current_hour < len(yesterday_conv):
+        now_delta = f"{_point_delta_str(now_value, yesterday_conv[current_hour])} vs. yesterday"
+    else:
+        now_delta = "No comparable data for yesterday"
+
+    projection = _project_remaining_hours(today_conv, current_hour)
+    projection_text = (
+        f"Trending toward ~{projection[-1]:g}% by end of day" if projection else "Day complete"
+    )
+
+    return {
+        "currentHour": current_hour,
+        "today": today_conv,
+        "yesterday": yesterday_conv,
+        "projection": projection,
+        "nowValue": now_value,
+        "nowDelta": now_delta,
+        "projectionText": projection_text,
+    }
 
 
 @router.get("/trends")
@@ -315,13 +433,6 @@ def get_trends(
 ) -> dict:
     data = json.loads((FIXTURES_DIR / "trends.json").read_text())
 
-    # hourly/pacing stay on fixtures for now — there's no hour-of-day
-    # granularity anywhere in the warehouse (HORIZONTAL_SUMMARY_TABLE is
-    # daily, MONTHLY_SUMMARY_TABLE is monthly), so there's nothing real to
-    # back "Hourly throughput", "Today's pacing", or an Hourly mode on the
-    # two daily trend charts below with yet — Hourly is disabled entirely
-    # on the frontend for those, rather than faked here.
-    #
     # The daily window is fixed at the selected date +/- 15 days (31 days
     # total) rather than a user-picked range: centering on the filter
     # panel's own date keeps this consistent with every other page, which
@@ -353,11 +464,58 @@ def get_trends(
     # as the empty-one-side case in get_funnel_comparison, just with no
     # other side to fall back on here.
     if daily:
-        data["conversionTrend"] = _build_conversion_trend(daily)
-        data["stageTrend"] = _build_stage_trend(daily)
+        daily_labels = [_fmt_date_label(b["date"])[1] for b in daily]
+        data["conversionTrend"] = _build_conversion_trend(daily, daily_labels)
+        data["stageTrend"] = _build_stage_trend(daily, daily_labels)
         _, short_start = _fmt_date_label(start.isoformat())
         _, short_end = _fmt_date_label(end.isoformat())
         data["subtitle"] = f"FUNNEL-WIDE + ENTRY-POINT TRENDS · {short_start.upper()} – {short_end.upper()}"
+
+    # One 8-day (selected date and the 7 days before it) hourly fetch backs
+    # everything hour-of-day on this page: the selected date's own buckets
+    # back Hourly throughput, Hourly mode on the two trend charts above,
+    # and "today" in Today's pacing; the day right before it backs
+    # "yesterday"; the other 6 back the trailing-7-day-same-hour band.
+    try:
+        hourly = queries.fetch_hourly_funnel_steps(
+            business=business,
+            product=product,
+            sub_product=sub_product,
+            journey=journey,
+            platform=platform,
+            version=version,
+            start_date=(center - timedelta(days=7)).isoformat(),
+            end_date=date,
+        )
+    except Exception:
+        logger.exception("fetch_hourly_funnel_steps failed, falling back to fixture hourly data")
+        hourly = None
+
+    if hourly:
+        today_buckets = [b for b in hourly if b["date"] == date]
+        yesterday_date = (center - timedelta(days=1)).isoformat()
+        yesterday_buckets = [b for b in hourly if b["date"] == yesterday_date]
+
+        # Trailing-7-day-same-hour band: every bucket that isn't today,
+        # grouped by hour (yesterday's included — it's part of "the last 7
+        # days" for this purpose even though it's *also* its own line on
+        # the pacing chart, two different questions about the same data).
+        band_by_hour: dict[int, list[float]] = {}
+        for b in hourly:
+            if b["date"] == date:
+                continue
+            band_by_hour.setdefault(b["hour"], []).append(_step_conv_pct(b["steps"]))
+
+        # today_buckets (not `hourly`) deliberately: there's no reference
+        # stage list / hour axis to build Hourly-mode charts or throughput
+        # from if the selected date itself has no data, even if the
+        # trailing days do.
+        if today_buckets:
+            hour_labels = [_fmt_hour_label(b["hour"]) for b in today_buckets]
+            data["hourlyConversionTrend"] = _build_conversion_trend(today_buckets, hour_labels)
+            data["hourlyStageTrend"] = _build_stage_trend(today_buckets, hour_labels)
+            data["hourly"] = _build_hourly_throughput(today_buckets, band_by_hour)
+            data["pacing"] = _build_pacing(today_buckets, yesterday_buckets)
 
     return data
 

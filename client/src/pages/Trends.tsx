@@ -7,6 +7,7 @@ import HourlyThroughputChart from "../components/trends/HourlyThroughputChart";
 import PacingChart from "../components/trends/PacingChart";
 import ConversionTrendMultiLine from "../components/trends/ConversionTrendMultiLine";
 import DailyHourlyToggle from "../components/trends/DailyHourlyToggle";
+import type { TrendGranularity } from "../components/trends/DailyHourlyToggle";
 import SeriesMultiSelect from "../components/trends/SeriesMultiSelect";
 import FiltersButton from "../components/filters/FiltersButton";
 import FilterBar from "../components/overview/FilterBar";
@@ -25,21 +26,28 @@ function LegendDot({ color, label, dashed = false }: { color: string; label: str
   );
 }
 
-// Shared by both daily trend panels below: a title/subtitle on the left,
-// the series multi-select + Daily|Hourly toggle on the right, then the
-// chart itself — the only thing that differs between "Conversion rate
-// trend" and "Stage-wise trends" is which series set feeds it and what the
-// lines represent (a %, vs. a raw user count).
+// Shared by both trend panels below: a title/subtitle on the left, the
+// series multi-select + Daily|Hourly toggle on the right, then the chart
+// itself — the only thing that differs between "Conversion rate trend" and
+// "Stage-wise trends" is which series set feeds it and what the lines
+// represent (a %, vs. a raw user count). Daily vs. Hourly is resolved by
+// the caller (Trends picks conversionTrend vs. hourlyConversionTrend, etc.
+// — both already came down in the same response, so switching modes here
+// is instant, no refetch).
 function TrendPanel({
   title,
-  subtitle,
+  subtitleBase,
+  granularity,
+  onGranularityChange,
   dates,
   allSeries,
   selected,
   onSelectedChange,
 }: {
   title: string;
-  subtitle: string;
+  subtitleBase: string;
+  granularity: TrendGranularity;
+  onGranularityChange: (v: TrendGranularity) => void;
   dates: string[];
   allSeries: TrendsData["conversionTrend"]["series"];
   selected: Set<string>;
@@ -53,11 +61,13 @@ function TrendPanel({
         <div className="flex-1" />
         <div className="flex items-center gap-[10px]">
           <SeriesMultiSelect options={allSeries} selected={selected} onChange={onSelectedChange} />
-          <DailyHourlyToggle />
+          <DailyHourlyToggle value={granularity} onChange={onGranularityChange} />
         </div>
       </div>
       <div className="mb-3 flex items-center gap-[12px] font-mono text-[10px] text-[var(--color-faint)]">
-        <span>{subtitle}</span>
+        <span>
+          {subtitleBase}, {granularity.toUpperCase()}
+        </span>
         <div className="flex-1" />
         <div className="flex flex-wrap items-center justify-end gap-[10px]">
           {visibleSeries.map((s) => (
@@ -82,6 +92,8 @@ function TrendPanel({
 export default function Trends() {
   const filters = useFiltersContext();
   const [data, setData] = useState<TrendsData | null>(null);
+  const [conversionMode, setConversionMode] = useState<TrendGranularity>("daily");
+  const [stageMode, setStageMode] = useState<TrendGranularity>("daily");
   const [conversionSelected, setConversionSelected] = useState<Set<string>>(new Set());
   const [stageSelected, setStageSelected] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
@@ -90,26 +102,34 @@ export default function Trends() {
   useEffect(() => {
     setError(null);
     fetchTrends(filters.filters)
-      .then((d) => {
-        setData(d);
-        // Default to showing every series — the multi-select narrows from
-        // there. Reseeded on every fetch since a filter/date change can
-        // return a different stage set entirely (see get_trends).
-        setConversionSelected(new Set(d.conversionTrend.series.map((s) => s.key)));
-        setStageSelected(new Set(d.stageTrend.series.map((s) => s.key)));
-      })
+      .then(setData)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
     // Refetch whenever any active filter or the selected date changes —
     // same dependency shape as the other filter-driven pages (see
-    // FunnelDetail.tsx). The trend window itself is fixed (selected date
-    // +/- 15 days, see get_trends), not a user-picked range anymore.
+    // FunnelDetail.tsx). The trend windows themselves are fixed server-side
+    // (see get_trends), not user-picked ranges.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.filters, reloadKey]);
+
+  const conversionTrend = conversionMode === "daily" ? data?.conversionTrend : data?.hourlyConversionTrend;
+  const stageTrend = stageMode === "daily" ? data?.stageTrend : data?.hourlyStageTrend;
+
+  // Default to showing every series — the multi-select narrows from there.
+  // Reseeded whenever new data arrives (a filter/date change can return an
+  // entirely different stage set) or the Daily|Hourly toggle flips (the
+  // two modes' series aren't the same set, e.g. a 13-stage daily funnel vs.
+  // whatever stages actually have hourly rows for just the selected date).
+  useEffect(() => {
+    if (conversionTrend) setConversionSelected(new Set(conversionTrend.series.map((s) => s.key)));
+  }, [conversionTrend]);
+  useEffect(() => {
+    if (stageTrend) setStageSelected(new Set(stageTrend.series.map((s) => s.key)));
+  }, [stageTrend]);
 
   if (error) {
     return <LoadError message={error} onRetry={() => setReloadKey((k) => k + 1)} />;
   }
-  if (!data) {
+  if (!data || !conversionTrend || !stageTrend) {
     return <div className="p-8 font-mono text-sm text-[var(--color-muted)]">Loading…</div>;
   }
 
@@ -147,9 +167,11 @@ export default function Trends() {
             LAST 24H · CONV. RATE VS. TRAILING 7-DAY SAME-HOUR AVERAGE
           </div>
           <HourlyThroughputChart hourly={data.hourly} />
-          <div className="mt-3 rounded-[8px] bg-[var(--color-danger-soft)] px-[14px] py-[10px] font-mono text-[11.5px] leading-[1.45] text-[var(--color-danger)]">
-            <span dangerouslySetInnerHTML={{ __html: data.hourly.alertHtml }} />
-          </div>
+          {data.hourly.alertHtml && (
+            <div className="mt-3 rounded-[8px] bg-[var(--color-danger-soft)] px-[14px] py-[10px] font-mono text-[11.5px] leading-[1.45] text-[var(--color-danger)]">
+              <span dangerouslySetInnerHTML={{ __html: data.hourly.alertHtml }} />
+            </div>
+          )}
         </Panel>
 
         <Panel className="p-[20px]">
@@ -171,17 +193,21 @@ export default function Trends() {
       <div className="flex flex-col gap-3">
         <TrendPanel
           title="Conversion rate trend"
-          subtitle="% OF ENTRANTS REACHING EACH STAGE, DAILY"
-          dates={data.conversionTrend.dates}
-          allSeries={data.conversionTrend.series}
+          subtitleBase="% OF ENTRANTS REACHING EACH STAGE"
+          granularity={conversionMode}
+          onGranularityChange={setConversionMode}
+          dates={conversionTrend.dates}
+          allSeries={conversionTrend.series}
           selected={conversionSelected}
           onSelectedChange={setConversionSelected}
         />
         <TrendPanel
           title="Stage-wise trends"
-          subtitle="USERS REACHING EACH STAGE, DAILY"
-          dates={data.stageTrend.dates}
-          allSeries={data.stageTrend.series}
+          subtitleBase="USERS REACHING EACH STAGE"
+          granularity={stageMode}
+          onGranularityChange={setStageMode}
+          dates={stageTrend.dates}
+          allSeries={stageTrend.series}
           selected={stageSelected}
           onSelectedChange={setStageSelected}
         />

@@ -217,7 +217,9 @@ export interface TrendsData {
     convRate: number[];
     expectedLow: number[];
     expectedHigh: number[];
-    alertHtml: string;
+    // null when nothing's actually anomalous — no banner to show, rather
+    // than an alert box with nothing wrong to report.
+    alertHtml: string | null;
   };
   pacing: {
     currentHour: number;
@@ -235,6 +237,18 @@ export interface TrendsData {
   // Same shape as conversionTrend, but each series is a stage's raw daily
   // user count instead of a conversion percentage to the next stage.
   stageTrend: {
+    dates: string[];
+    series: TrendSeries[];
+  };
+  // Hourly-mode counterparts of conversionTrend/stageTrend: same shapes,
+  // but the x-axis is the selected date's hours instead of a +/-15-day
+  // window of dates. Fetched alongside the daily versions on every
+  // request so switching the Daily|Hourly toggle is instant — no refetch.
+  hourlyConversionTrend: {
+    dates: string[];
+    series: TrendSeries[];
+  };
+  hourlyStageTrend: {
     dates: string[];
     series: TrendSeries[];
   };
