@@ -2,22 +2,25 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { fetchEntrypointSourceDetail } from "../api/client";
 import type { FunnelDetailData } from "../api/types";
+import { useFiltersContext } from "../context/FiltersContext";
 import FunnelDetailView from "../components/funnelDetail/FunnelDetailView";
 import LoadError from "../components/ui/LoadError";
 
 export default function EntrypointSourceDetail() {
   const { funnelId = "guest-checkout", sourceId = "" } = useParams();
   const navigate = useNavigate();
+  const filters = useFiltersContext();
   const [data, setData] = useState<FunnelDetailData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     setError(null);
-    fetchEntrypointSourceDetail(funnelId, sourceId)
+    fetchEntrypointSourceDetail(funnelId, sourceId, filters.filters)
       .then(setData)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
-  }, [funnelId, sourceId, reloadKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [funnelId, sourceId, filters.filters, reloadKey]);
 
   if (error) {
     return <LoadError message={error} onRetry={() => setReloadKey((k) => k + 1)} />;

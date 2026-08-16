@@ -32,6 +32,21 @@ HOURLY_SUMMARY_TABLE = os.environ.get(
     "HOURLY_SUMMARY_TABLE", "digital360.business_funnel_hourly"
 )
 
+# Same dimension columns as HORIZONTAL_SUMMARY_TABLE, plus ENTRYPOINT_GROUP
+# (which entrypoint_group a session came in through) and five pre-computed
+# percentage columns: PDP_VIEW_PCT / PDP_CLICK_PCT / FORM1_VIEW_PCT /
+# FORM1_CLICK_PCT (that group's own 4-stage funnel, each a % of that group's
+# own entered sessions — same "cumulative % of the first stage" shape as
+# convPct elsewhere, not stage-to-stage) and PDP_VIEW_EP_CONTRI_PCT (this
+# group's % contribution to the *total* PDP views across every group).
+# Backs the Entrypoint Performance page end to end. This table is
+# session-level, not user-level — the raw count column is still named
+# "users" (same as every other table here), but counts sessions, not
+# deduplicated users, hence that page labeling everything "sessions".
+ENTRYPOINT_FUNNEL_TABLE = os.environ.get(
+    "ENTRYPOINT_FUNNEL_TABLE", "digital360.entrypoint_wise_funnel"
+)
+
 # Sentinel for "don't filter on this field" — only offered for Journey and
 # Version. Unlike business/product/sub_product (which narrow which data
 # exists at all and always need a real pick), journey and version are
@@ -306,6 +321,75 @@ def fetch_overview_funnel_steps(
         logger.error("fetch_overview_funnel_steps matched 0 rows for params=%r", params)
         _diagnose_empty_overview_result(params, journey, version)
     return _rows_to_steps(rows)
+
+
+def fetch_entrypoint_performance(
+    *,
+    business: str,
+    product: str,
+    sub_product: str,
+    journey: str,
+    platform: str,
+    version: str,
+    date: str,
+) -> list[dict]:
+    """Backs the Entrypoint Performance page end to end: one row per
+    entrypoint_group for the selected filters/date, with a raw session
+    count plus the percentage columns described in ENTRYPOINT_FUNNEL_TABLE's
+    comment. Same dimension filtering (upper()/coalesce()/journey&version
+    dropped on "All") as fetch_overview_funnel_steps, grouped by
+    entrypoint_group instead of STAGE_ORDER.
+
+    The percentage columns are averaged across whatever rows share an
+    entrypoint_group after every other filter is applied — with every other
+    dimension already pinned to one value and one date, that's normally
+    exactly one row per group; AVG just collapses defensively to one number
+    if the table ever has more than one row per group at this grain.
+    """
+    params = {
+        "business": business.upper(),
+        "product": product.upper(),
+        "sub_product": sub_product.upper(),
+        "journey": journey.upper(),
+        "platform": platform.upper(),
+        "version": version.upper(),
+        "date": _to_table_date(date),
+    }
+
+    query = f"""
+        SELECT
+            entrypoint_group,
+            SUM(users) AS sessions,
+            AVG("PDP_VIEW_EP_CONTRI_PCT") AS contribution_pct,
+            AVG("PDP_VIEW_PCT") AS pdp_view_pct,
+            AVG("PDP_CLICK_PCT") AS pdp_click_pct,
+            AVG("FORM1_VIEW_PCT") AS form1_view_pct,
+            AVG("FORM1_CLICK_PCT") AS form1_click_pct
+        FROM {ENTRYPOINT_FUNNEL_TABLE}
+        WHERE upper("BUSINESS") = upper(%(business)s)
+          AND upper("PRODUCT") = upper(%(product)s)
+          AND upper("SUB_PRODUCT") = upper(%(sub_product)s)
+          AND coalesce(upper("EP_PLATFORM"), 'APP') = upper(%(platform)s)
+          AND "DATE" = %(date)s"""
+    if journey != ALL_VALUE:
+        query += """
+          AND upper("Journey_name") = upper(%(journey)s)"""
+    if version != ALL_VALUE:
+        query += """
+          AND upper("ENTRYPOINT_STAGE") = upper(%(version)s)"""
+    query += """
+        GROUP BY entrypoint_group
+        ORDER BY sessions DESC
+    """
+
+    pool = db.get_connection()
+    with pool.connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(query, params)
+            rows = cur.fetchall()
+    if not rows:
+        logger.error("fetch_entrypoint_performance matched 0 rows for params=%r", params)
+    return rows
 
 
 def fetch_conversion_trend(

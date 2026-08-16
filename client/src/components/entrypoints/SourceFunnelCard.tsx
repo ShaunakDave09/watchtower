@@ -7,7 +7,7 @@ const tierColorByQuality = (quality: number) =>
 export default function SourceFunnelCard({ funnelId, source }: { funnelId: string; source: EntrypointBySource }) {
   const navigate = useNavigate();
   const color = tierColorByQuality(source.quality);
-  const base = source.stages[0]?.users || 1;
+  const base = source.stages[0]?.sessions || 1;
 
   return (
     <button
@@ -24,13 +24,13 @@ export default function SourceFunnelCard({ funnelId, source }: { funnelId: strin
             <div className="mb-[2px] flex items-baseline justify-between">
               <span className="font-mono text-[10px] text-[var(--color-faint)]">{stage.label}</span>
               <span className="font-mono text-[11px] font-semibold text-[var(--color-ink)]">
-                {stage.users.toLocaleString()}
+                {stage.sessions.toLocaleString()}
               </span>
             </div>
             <div className="h-[5px] overflow-hidden rounded-[3px] bg-[var(--color-hairline)]">
               <div
                 className="h-full rounded-[3px]"
-                style={{ width: `${(stage.users / base) * 100}%`, background: color }}
+                style={{ width: `${(stage.sessions / base) * 100}%`, background: color }}
               />
             </div>
           </div>

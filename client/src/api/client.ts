@@ -66,12 +66,39 @@ export function fetchFunnelDetail(funnelId: string, filters: FilterState): Promi
   return getJson(`/api/funnels/${funnelId}?${params}`);
 }
 
-export function fetchFunnelEntrypoints(funnelId: string): Promise<EntrypointData> {
-  return getJson(`/api/funnels/${funnelId}/entrypoints`);
+// Same filter set fetchTrends sends (minus `month` — entrypoint_wise_funnel
+// is read directly for the selected `date`, same as the daily table
+// elsewhere, not aggregated monthly). Previously this didn't send filters
+// at all, so the Filters button/bar shown on this page was decorative —
+// passing them is what makes the query actually scope to what's selected.
+export function fetchFunnelEntrypoints(funnelId: string, filters: FilterState): Promise<EntrypointData> {
+  const params = new URLSearchParams({
+    business: filters.business,
+    product: filters.product,
+    subProduct: filters.subProduct,
+    journey: filters.journey,
+    platform: filters.platform,
+    version: filters.version,
+    date: filters.date,
+  });
+  return getJson(`/api/funnels/${funnelId}/entrypoints?${params}`);
 }
 
-export function fetchEntrypointSourceDetail(funnelId: string, sourceId: string): Promise<FunnelDetailData> {
-  return getJson(`/api/funnels/${funnelId}/entrypoints/${sourceId}`);
+export function fetchEntrypointSourceDetail(
+  funnelId: string,
+  sourceId: string,
+  filters: FilterState,
+): Promise<FunnelDetailData> {
+  const params = new URLSearchParams({
+    business: filters.business,
+    product: filters.product,
+    subProduct: filters.subProduct,
+    journey: filters.journey,
+    platform: filters.platform,
+    version: filters.version,
+    date: filters.date,
+  });
+  return getJson(`/api/funnels/${funnelId}/entrypoints/${sourceId}?${params}`);
 }
 
 // Same filter set fetchFunnelDetail sends (minus `month` — this page

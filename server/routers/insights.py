@@ -1,6 +1,7 @@
 import calendar
 import json
 import logging
+import re
 from datetime import date as date_cls, timedelta
 from pathlib import Path
 from typing import Optional
@@ -17,20 +18,225 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["insights"])
 
 
+def _slugify(name: str) -> str:
+    """"Paid Social" -> "paid-social" — stable, URL-safe ids for
+    entrypoint_group values (which are free-text from the warehouse, not a
+    fixed enum), so /entrypoints/{source_id} has something to match on."""
+    slug = re.sub(r"[^a-z0-9]+", "-", name.strip().lower()).strip("-")
+    return slug or "group"
+
+
+# Same >=10/>=5 thresholds SourceFunnelCard.tsx's tierColorByQuality and
+# entrypoint_detail.py's _tier already use — kept in sync by convention
+# (small, stable, and duplicated in three places already before this one)
+# rather than sharing a single source of truth.
+def _quality_tier(quality: float) -> str:
+    if quality >= 10:
+        return "high"
+    if quality >= 5:
+        return "mid"
+    return "low"
+
+
+def _ordinal(n: int) -> str:
+    if 10 <= n % 100 <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
+
+
+def _volume_rank_note(sessions: int, ranked_sessions: list[int]) -> str:
+    """e.g. "highest volume" / "2nd-highest volume" / "lowest volume" —
+    matches the fixture's own hand-written phrasing for best/worst's volume
+    callout, computed from where this group's session count actually
+    lands among every group's, instead of being pre-written text."""
+    rank = ranked_sessions.index(sessions) + 1
+    if rank == 1:
+        return "highest volume"
+    if rank == len(ranked_sessions):
+        return "lowest volume"
+    return f"{_ordinal(rank)}-highest volume"
+
+
+# The Entrypoint Performance page's "funnel by entry point" stages, in
+# order — each entrypoint_wise_funnel column is a % of that group's own
+# entered sessions (cumulative, like convPct elsewhere, not stage-to-stage),
+# so a group's absolute session count at each stage is `sessions * pct/100`.
+ENTRYPOINT_STAGE_COLUMNS = [
+    ("pdp_view_pct", "PDP View"),
+    ("pdp_click_pct", "PDP Click"),
+    ("form1_view_pct", "Form1 View"),
+    ("form1_click_pct", "Form1 Click"),
+]
+
+
+def _build_entrypoint_performance(rows: list[dict], product: str) -> dict:
+    """Shapes fetch_entrypoint_performance's raw per-entrypoint_group rows
+    into EntrypointData (client/src/api/types.ts). Quality is Form1 Click's
+    % of entered — the funnel's last stage — matching the fixture's own
+    "quality = converted ÷ entered" definition. The convergence chart's
+    entry box represents PDP View (not "Stage 1"/landing page like the
+    fixture): each group's own PDP_VIEW_PCT × its sessions gives that
+    group's real PDP-view count, and summing those across groups is the
+    total the box shows, consistent with PDP_VIEW_EP_CONTRI_PCT being each
+    group's % contribution to that same total.
+    """
+    if not rows:
+        return {}
+
+    ranked_sessions = sorted((r["sessions"] or 0 for r in rows), reverse=True)
+    sources = []
+    by_source = []
+    total_pdp_views = 0
+
+    for row in rows:
+        group_name = row["entrypoint_group"] or "Unknown"
+        source_id = _slugify(group_name)
+        sessions = row["sessions"] or 0
+        quality = round(row["form1_click_pct"] or 0.0, 1)
+        contribution = round(row["contribution_pct"] or 0.0, 1)
+
+        stages = [
+            {"label": label, "sessions": round(sessions * (row[key] or 0.0) / 100)}
+            for key, label in ENTRYPOINT_STAGE_COLUMNS
+        ]
+        total_pdp_views += stages[0]["sessions"]
+
+        sources.append(
+            {
+                "id": source_id,
+                "name": group_name,
+                "entered": sessions,
+                "contributionPct": contribution,
+                "quality": quality,
+                "tier": _quality_tier(quality),
+            }
+        )
+        by_source.append({"id": source_id, "name": group_name, "quality": quality, "stages": stages})
+
+    best = max(sources, key=lambda s: s["quality"])
+    worst = min(sources, key=lambda s: s["quality"])
+
+    return {
+        "funnelName": product,
+        "meta": f"{len(sources)} sources feeding PDP view · quality = Form1 click ÷ entered",
+        "funnelEntry": total_pdp_views,
+        "funnelEntryLabel": "PDP View",
+        "best": {
+            "source": best["name"],
+            "quality": best["quality"],
+            "note": _volume_rank_note(best["entered"], ranked_sessions),
+        },
+        "worst": {
+            "source": worst["name"],
+            "quality": worst["quality"],
+            "note": _volume_rank_note(worst["entered"], ranked_sessions),
+        },
+        "sources": sources,
+        "bySource": by_source,
+    }
+
+
 @router.get("/funnels/{funnel_id}/entrypoints")
-def get_funnel_entrypoints(funnel_id: str) -> dict:
+def get_funnel_entrypoints(
+    funnel_id: str,
+    # Same filter set Trends sends (no `month` — entrypoint_wise_funnel is
+    # read for the selected `date` directly, same as the daily table
+    # elsewhere, not aggregated monthly).
+    business: str = Query(...),
+    product: str = Query(...),
+    sub_product: str = Query(..., alias="subProduct"),
+    journey: str = Query(...),
+    platform: str = Query(...),
+    version: str = Query(...),
+    date: str = Query(...),
+) -> dict:
     entrypoints = json.loads((FIXTURES_DIR / "entrypoints.json").read_text())
-    return entrypoints.get(funnel_id, entrypoints["guest-checkout"])
+    data = entrypoints.get(funnel_id, entrypoints["guest-checkout"])
+    data["funnelId"] = funnel_id
+
+    try:
+        rows = queries.fetch_entrypoint_performance(
+            business=business,
+            product=product,
+            sub_product=sub_product,
+            journey=journey,
+            platform=platform,
+            version=version,
+            date=date,
+        )
+    except Exception:
+        logger.exception("fetch_entrypoint_performance failed, falling back to fixture entrypoints")
+        rows = None
+
+    # Unlike the `is not None` convention used elsewhere (an empty list is
+    # real "no data" info worth showing as-is): ConvergenceDiagram and
+    # SourceFunnelCard have no empty-state rendering of their own (an empty
+    # `sources` list degenerates into a blank diagram, not a friendly
+    # message), so an empty real result still falls back to the fixture
+    # here rather than rendering that blank state.
+    if rows:
+        built = _build_entrypoint_performance(rows, product)
+        if built:
+            data.update(built)
+
+    return data
 
 
 @router.get("/funnels/{funnel_id}/entrypoints/{source_id}")
-def get_entrypoint_source_detail(funnel_id: str, source_id: str) -> dict:
+def get_entrypoint_source_detail(
+    funnel_id: str,
+    source_id: str,
+    business: str = Query(...),
+    product: str = Query(...),
+    sub_product: str = Query(..., alias="subProduct"),
+    journey: str = Query(...),
+    platform: str = Query(...),
+    version: str = Query(...),
+    date: str = Query(...),
+) -> dict:
     entrypoints = json.loads((FIXTURES_DIR / "entrypoints.json").read_text())
-    funnel = entrypoints.get(funnel_id, entrypoints["guest-checkout"])
-    source = next((s for s in funnel["bySource"] if s["id"] == source_id), None)
+    fixture_funnel = entrypoints.get(funnel_id, entrypoints["guest-checkout"])
+    by_source = fixture_funnel["bySource"]
+    funnel_name = fixture_funnel["funnelName"]
+
+    try:
+        rows = queries.fetch_entrypoint_performance(
+            business=business,
+            product=product,
+            sub_product=sub_product,
+            journey=journey,
+            platform=platform,
+            version=version,
+            date=date,
+        )
+    except Exception:
+        logger.exception("fetch_entrypoint_performance failed, falling back to fixture entrypoints")
+        rows = None
+
+    if rows:
+        built = _build_entrypoint_performance(rows, product)
+        if built.get("bySource"):
+            by_source = built["bySource"]
+            funnel_name = product
+
+    source = next((s for s in by_source if s["id"] == source_id), None)
     if source is None:
         raise HTTPException(status_code=404, detail=f"Unknown entry point source: {source_id}")
-    return build_source_detail(funnel_id, funnel["funnelName"], source)
+
+    # build_source_detail's output feeds the same shared FunnelDetailView/
+    # StagesTable every other funnel page uses (whose "USERS" header is
+    # deliberately left as-is there, since most of those other pages really
+    # are user-level) — so it still expects each stage as {"label", "users"}
+    # even though `by_source` above calls the same field "sessions" for this
+    # page's own cards. Translate at this one boundary rather than
+    # threading a header-label override through the shared component.
+    source_for_detail = {
+        **source,
+        "stages": [{"label": s["label"], "users": s["sessions"]} for s in source["stages"]],
+    }
+    return build_source_detail(funnel_id, funnel_name, source_for_detail)
 
 
 # Quick-compare pill labels the frontend offers (comparison.json's

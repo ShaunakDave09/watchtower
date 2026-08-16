@@ -21,25 +21,25 @@ import LoadError from "../components/ui/LoadError";
 // page yet, so both the pacing and entry-point data reuse it too.
 const OVERVIEW_FUNNEL_ID = "guest-checkout";
 
-// bySource's stage-by-stage counts (see EntrypointData) are raw users, not
-// the conversion percentages ComparisonPanel's rows expect — the same
-// stage.users/stages[0].users ratio SourceFunnelCard already uses to draw
-// its own per-source bars. Matching best.source/worst.source by name (not
-// index) since bySource isn't sorted by quality.
+// bySource's stage-by-stage counts (see EntrypointData) are raw sessions,
+// not the conversion percentages ComparisonPanel's rows expect — the same
+// stage.sessions/stages[0].sessions ratio SourceFunnelCard already uses to
+// draw its own per-source bars. Matching best.source/worst.source by name
+// (not index) since bySource isn't sorted by quality.
 function buildEntrypointComparisonRows(entrypoints: EntrypointData): ComparisonStageRow[] {
   const best = entrypoints.bySource.find((s) => s.name === entrypoints.best.source);
   const worst = entrypoints.bySource.find((s) => s.name === entrypoints.worst.source);
   if (!best || !worst) return [];
-  const bestBase = best.stages[0]?.users || 1;
-  const worstBase = worst.stages[0]?.users || 1;
+  const bestBase = best.stages[0]?.sessions || 1;
+  const worstBase = worst.stages[0]?.sessions || 1;
   const n = Math.min(best.stages.length, worst.stages.length);
   const rows: ComparisonStageRow[] = [];
   for (let i = 0; i < n; i++) {
     // toFixed(1) then back through Number() so e.g. 100.0 -> "100%" but
     // 9.14 -> "9.1%" — matches the fixture's own (hand-authored) rounding,
     // which drops the decimal only when it's a flat zero.
-    const bestPct = Number(((best.stages[i].users / bestBase) * 100).toFixed(1));
-    const worstPct = Number(((worst.stages[i].users / worstBase) * 100).toFixed(1));
+    const bestPct = Number(((best.stages[i].sessions / bestBase) * 100).toFixed(1));
+    const worstPct = Number(((worst.stages[i].sessions / worstBase) * 100).toFixed(1));
     rows.push({ stage: best.stages[i].label, app: `${bestPct}%`, web: `${worstPct}%` });
   }
   return rows;
@@ -77,11 +77,9 @@ export default function Overview() {
   // same fixture values regardless of what's passed here. Still refetching
   // on filter change for consistency with every other filter-driven call
   // in the app, and in case pacing gets wired to something real later.
-  // Entrypoints are looked up by funnel id only (see EntrypointPerformance),
-  // so that one has nothing to depend on beyond mount. Both are kept as a
-  // soft failure (logged, not surfaced via the page's LoadError): these two
-  // panels are a bonus on top of the main Overview data, not load-bearing
-  // for the page the way `data` is.
+  // Both kept as a soft failure (logged, not surfaced via the page's
+  // LoadError): these two panels are a bonus on top of the main Overview
+  // data, not load-bearing for the page the way `data` is.
   useEffect(() => {
     fetchTrends(filters.filters)
       .then(setTrends)
@@ -90,10 +88,11 @@ export default function Overview() {
   }, [filters.filters]);
 
   useEffect(() => {
-    fetchFunnelEntrypoints(OVERVIEW_FUNNEL_ID)
+    fetchFunnelEntrypoints(OVERVIEW_FUNNEL_ID, filters.filters)
       .then(setEntrypoints)
       .catch((e) => console.error("Failed to load entrypoints for comparison panel", e));
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.filters]);
 
   if (error) {
     return <LoadError message={error} onRetry={() => setReloadKey((k) => k + 1)} />;
