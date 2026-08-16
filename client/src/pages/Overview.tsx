@@ -80,7 +80,7 @@ export default function Overview() {
   // panels are a bonus on top of the main Overview data, not load-bearing
   // for the page the way `data` is.
   useEffect(() => {
-    fetchTrends(filters.filters, "30d")
+    fetchTrends(filters.filters)
       .then(setTrends)
       .catch((e) => console.error("Failed to load trends for Today's pacing panel", e));
     // eslint-disable-next-line react-hooks/exhaustive-deps
