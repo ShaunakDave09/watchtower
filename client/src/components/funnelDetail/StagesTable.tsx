@@ -17,13 +17,22 @@ function csvEscape(value: string): string {
 // FILTER_COLUMNS in server/queries.py) rather than the filter modal's
 // display labels, since that's the vocabulary this CSV is meant to be
 // cross-referenced against.
+// Drop from the first stage is 100 - convPct: convPct is already defined
+// (see server/queries.py's _rows_to_steps) as this stage's users as a % of
+// the very first stage's, so there's nothing to fetch — every row already
+// carries what's needed to derive it.
+function totalDropPct(stage: FunnelStep): number {
+  return Math.round((100 - stage.convPct) * 10) / 10;
+}
+
 function stagesToCsv(stages: FunnelStep[], filters: FilterState): string {
   const header = [
     "Step",
     "Stage",
     "Users",
     "Conv %",
-    "Drop %",
+    "Drop from prev. stage %",
+    "Drop from 1st stage %",
     "BUSINESS",
     "PRODUCT",
     "SUB_PRODUCT",
@@ -38,6 +47,7 @@ function stagesToCsv(stages: FunnelStep[], filters: FilterState): string {
     String(s.users),
     String(s.convPct),
     s.dropPct === null ? "" : String(s.dropPct),
+    s.dropPct === null ? "" : String(totalDropPct(s)),
     filters.business,
     filters.product,
     filters.subProduct,
@@ -102,7 +112,19 @@ export default function StagesTable({ stages, funnelName = "funnel" }: { stages:
         <div className="w-[130px] flex-none">STAGE</div>
         <div className="w-[70px] flex-none text-right">USERS</div>
         <div className="w-[52px] flex-none text-right">CONV %</div>
-        <div className="w-[52px] flex-none text-right">DROP</div>
+        {/* "PREV DROP" (this stage vs. the one right before it — the
+            existing "DROP" column, renamed) and the new "1ST DROP" (this
+            stage vs. the very first stage), side by side. Spelling either
+            out in full ("drop from prev. stage" / "drop from 1st stage")
+            would wrap or blow out these narrow columns, so the headers
+            abbreviate symmetrically while a title tooltip carries the
+            rest. */}
+        <div className="w-[58px] flex-none text-right" title="Drop from the previous stage">
+          PREV DROP
+        </div>
+        <div className="w-[58px] flex-none text-right" title="Drop from the first stage">
+          1ST DROP
+        </div>
         <div className="min-w-[120px] flex-1 text-center">BAR</div>
       </div>
 
@@ -140,13 +162,20 @@ export default function StagesTable({ stages, funnelName = "funnel" }: { stages:
               >
                 {stage.convPct}%
               </div>
-              <div className="w-[52px] flex-none text-right font-mono text-[11px]">
+              <div className="w-[58px] flex-none text-right font-mono text-[11px]">
                 {stage.dropPct === null ? (
                   <span className="text-[var(--color-faint)]">—</span>
                 ) : (
                   <span className={stage.worst ? "font-bold text-[var(--color-danger)]" : "text-[var(--color-danger)]"}>
                     ↓{stage.dropPct}%
                   </span>
+                )}
+              </div>
+              <div className="w-[58px] flex-none text-right font-mono text-[11px]">
+                {stage.dropPct === null ? (
+                  <span className="text-[var(--color-faint)]">—</span>
+                ) : (
+                  <span className="text-[var(--color-ink-soft)]">↓{totalDropPct(stage)}%</span>
                 )}
               </div>
               <div className="h-[18px] min-w-[120px] flex-1 overflow-hidden rounded-[4px] bg-[var(--color-hairline)]">

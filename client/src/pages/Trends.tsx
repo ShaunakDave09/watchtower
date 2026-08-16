@@ -65,22 +65,37 @@ function TrendPanel({
           <DailyHourlyToggle value={granularity} onChange={onGranularityChange} />
         </div>
       </div>
-      <div className="mb-3 flex items-center gap-[12px] font-mono text-[10px] text-[var(--color-faint)]">
-        <span>
-          {subtitleBase}, {granularity.toUpperCase()}
-        </span>
-        <div className="flex-1" />
-        <div className="flex flex-wrap items-center justify-end gap-[10px]">
-          {visibleSeries.map((s) => (
-            <span key={s.key} className="flex items-center gap-[5px]">
-              <span className="h-[7px] w-[7px] rounded-full" style={{ background: s.color }} />
-              {s.label}
-            </span>
-          ))}
-        </div>
+      <div className="mb-3 font-mono text-[10px] text-[var(--color-faint)]">
+        {subtitleBase}, {granularity.toUpperCase()}
       </div>
       {visibleSeries.length > 0 ? (
-        <ConversionTrendMultiLine dates={dates} series={visibleSeries} />
+        // Series labels live in their own scrollable column to the right
+        // of the chart instead of a row above it — with up to ~13 series
+        // for a deep funnel, a wrapping row above the chart either grew
+        // tall enough to push the chart down or ran off the edge; a fixed-
+        // width column that scrolls its own overflow keeps the chart's
+        // height stable regardless of how many series are showing.
+        // `items-stretch` (the flex default) is what makes the legend
+        // column's height track the chart's actual rendered height rather
+        // than a guessed pixel value, since the SVG's own height is
+        // responsive to its container width.
+        <div className="flex items-stretch gap-4">
+          <div className="min-w-0 flex-1">
+            <ConversionTrendMultiLine dates={dates} series={visibleSeries} />
+          </div>
+          <div className="w-[170px] flex-none overflow-y-auto">
+            <div className="flex flex-col gap-[8px]">
+              {visibleSeries.map((s) => (
+                <div key={s.key} className="flex items-center gap-[6px] font-mono text-[10px] text-[var(--color-faint)]">
+                  <span className="h-[7px] w-[7px] flex-none rounded-full" style={{ background: s.color }} />
+                  <span className="truncate" title={s.label}>
+                    {s.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       ) : (
         <div className="flex h-[140px] items-center justify-center rounded-lg border border-dashed border-[var(--color-border-strong)] font-mono text-[12px] text-[var(--color-muted)]">
           No series selected
