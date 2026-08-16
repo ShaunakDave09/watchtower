@@ -282,6 +282,73 @@ def fetch_overview_funnel_steps(
     return _rows_to_steps(rows)
 
 
+def fetch_conversion_trend(
+    *,
+    business: str,
+    product: str,
+    sub_product: str,
+    journey: str,
+    platform: str,
+    version: str,
+    start_date: str,
+    end_date: str,
+) -> list[dict]:
+    """Same dimension filtering as fetch_overview_funnel_steps, but grouped
+    by DATE too and over an inclusive date range instead of a single day —
+    backs Trends' conversion-rate-trend chart (the 7d/30d/90d range picker).
+
+    One day can genuinely have data for some stages and not others (e.g. a
+    stage nobody reached that day just has no matching rows at all — there's
+    no zero-row to group), so this returns each day's *actual* stage list
+    rather than a fixed-length one; the caller decides how to reconcile
+    that against a reference stage set instead of this function guessing.
+    """
+    params = {
+        "business": business.upper(),
+        "product": product.upper(),
+        "sub_product": sub_product.upper(),
+        "journey": journey.upper(),
+        "platform": platform.upper(),
+        "version": version.upper(),
+        "start_date": _to_table_date(start_date),
+        "end_date": _to_table_date(end_date),
+    }
+
+    query = f"""
+        SELECT "DATE", "STAGE_ORDER", "STAGE_NAMES", SUM(users) AS users
+        FROM {HORIZONTAL_SUMMARY_TABLE}
+        WHERE upper("BUSINESS") = upper(%(business)s)
+          AND upper("PRODUCT") = upper(%(product)s)
+          AND upper("SUB_PRODUCT") = upper(%(sub_product)s)
+          AND coalesce(upper("EP_PLATFORM"), 'APP') = upper(%(platform)s)
+          AND "DATE" BETWEEN %(start_date)s AND %(end_date)s"""
+    if journey != ALL_VALUE:
+        query += """
+          AND upper("Journey_name") = upper(%(journey)s)"""
+    if version != ALL_VALUE:
+        query += """
+          AND upper("ENTRYPOINT_STAGE") = upper(%(version)s)"""
+    query += """
+        GROUP BY "DATE", "STAGE_ORDER", "STAGE_NAMES"
+        ORDER BY "DATE", "STAGE_ORDER"
+    """
+
+    pool = db.get_connection()
+    with pool.connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(query, params)
+            rows = cur.fetchall()
+    if not rows:
+        logger.error("fetch_conversion_trend matched 0 rows for params=%r", params)
+        return []
+
+    by_date: dict[str, list[dict]] = {}
+    for row in rows:
+        iso_date = _from_table_date(str(row["DATE"]))
+        by_date.setdefault(iso_date, []).append({"label": row["STAGE_NAMES"], "users": row["users"]})
+    return [{"date": d, "steps": steps} for d, steps in sorted(by_date.items())]
+
+
 def _diagnose_empty_overview_result(params: dict, journey: str, version: str) -> None:
     """Best-effort: fetch_overview_funnel_steps matched zero rows for this
     exact combination — figure out *which* predicate is responsible instead

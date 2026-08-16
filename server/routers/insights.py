@@ -204,9 +204,132 @@ def get_funnel_comparison(
     return data
 
 
+# Small, fixed palette to color an arbitrary number of adjacent-stage
+# transitions — real stage counts vary a lot by filter combo (this app has
+# shown anywhere from ~4 to 13 stages depending on business/product/journey/
+# version), so a hardcoded one-color-per-named-transition list (like the
+# fixture's) doesn't generalize. Cycles if there are more transitions than
+# colors.
+_TREND_COLORS = [
+    "var(--color-accent)",
+    "var(--color-warning)",
+    "var(--color-success)",
+    "#8a5fe8",
+    "#5f9ee8",
+    "#c9a68a",
+]
+
+_RANGE_DAYS = {"7d": 7, "30d": 30, "90d": 90}
+
+
+def _build_conversion_trend(daily: list[dict]) -> dict:
+    """One series per adjacent stage-to-stage transition, plus one overall
+    first-stage-to-last-stage series — every real transition, per the
+    "matches the original spirit most closely" choice over a fixed 1-2-line
+    chart, since a real deep funnel can have many more than the fixture's 4
+    stages.
+
+    The *reference* stage order is the most recent day's stage list (best
+    guess at the combination's current shape). A day missing one of those
+    stages entirely (fetch_conversion_trend only returns stages that
+    actually had rows) contributes 0 users for it that day — real
+    information (nobody reached it), not a gap in the line.
+    """
+    reference_labels = [s["label"] for s in daily[-1]["steps"]]
+    dates = [_fmt_date_label(d["date"])[1] for d in daily]
+    per_day_users = [{s["label"]: s["users"] for s in d["steps"]} for d in daily]
+
+    def transition_values(prev_label: str, cur_label: str) -> list[float]:
+        values = []
+        for day_users in per_day_users:
+            prev_users = day_users.get(prev_label, 0)
+            cur_users = day_users.get(cur_label, 0)
+            values.append(round(cur_users / prev_users * 100, 1) if prev_users else 0.0)
+        return values
+
+    series = []
+    for i in range(1, len(reference_labels)):
+        prev_label, cur_label = reference_labels[i - 1], reference_labels[i]
+        values = transition_values(prev_label, cur_label)
+        series.append(
+            {
+                "key": f"stage{i - 1}to{i}",
+                "label": f"{prev_label}→{cur_label}",
+                "color": _TREND_COLORS[(i - 1) % len(_TREND_COLORS)],
+                "values": values,
+                "endLabel": f"{values[-1]:g}%",
+            }
+        )
+
+    if len(reference_labels) >= 2:
+        values = transition_values(reference_labels[0], reference_labels[-1])
+        series.append(
+            {
+                "key": "overall",
+                "label": f"{reference_labels[0]}→{reference_labels[-1]}",
+                "color": "#8a7c65",
+                "values": values,
+                "endLabel": None,
+            }
+        )
+
+    return {"dates": dates, "series": series}
+
+
 @router.get("/trends")
-def get_trends() -> dict:
-    return json.loads((FIXTURES_DIR / "trends.json").read_text())
+def get_trends(
+    # Same filter set Funnel Detail sends (minus `month` — this endpoint
+    # already has its own range picker, 7d/30d/90d, and always queries the
+    # daily table directly rather than switching to the monthly one).
+    business: str = Query(...),
+    product: str = Query(...),
+    sub_product: str = Query(..., alias="subProduct"),
+    journey: str = Query(...),
+    platform: str = Query(...),
+    version: str = Query(...),
+    date: str = Query(...),
+    range_: str = Query("30d", alias="range"),
+) -> dict:
+    data = json.loads((FIXTURES_DIR / "trends.json").read_text())
+
+    # hourly/pacing stay on fixtures for now — there's no hour-of-day
+    # granularity anywhere in the warehouse (HORIZONTAL_SUMMARY_TABLE is
+    # daily, MONTHLY_SUMMARY_TABLE is monthly), so there's nothing real to
+    # back "Hourly throughput" or "Today's pacing" with yet.
+    days = _RANGE_DAYS.get(range_, 30)
+    y, m, d = (int(p) for p in date.split("-"))
+    end = date_cls(y, m, d)
+    start = end - timedelta(days=days - 1)
+
+    try:
+        daily = queries.fetch_conversion_trend(
+            business=business,
+            product=product,
+            sub_product=sub_product,
+            journey=journey,
+            platform=platform,
+            version=version,
+            start_date=start.isoformat(),
+            end_date=end.isoformat(),
+        )
+    except Exception:
+        logger.exception("fetch_conversion_trend failed, falling back to fixture conversion trend")
+        daily = None
+
+    # `daily` (not `is not None`) deliberately: an empty list means the
+    # query ran fine but matched nothing across the whole range, and
+    # there's no sensible reference stage list or date axis to build a
+    # chart from in that case — same "nothing to compare against" reasoning
+    # as the empty-one-side case in get_funnel_comparison, just with no
+    # other side to fall back on here.
+    if daily:
+        data["period"] = range_
+        data["conversionTrend"] = _build_conversion_trend(daily)
+        _, short_start = _fmt_date_label(start.isoformat())
+        _, short_end = _fmt_date_label(end.isoformat())
+        data["subtitle"] = f"FUNNEL-WIDE + ENTRY-POINT TRENDS · {short_start.upper()} – {short_end.upper()}"
+
+    return data
 
 
 @router.get("/alerts")
