@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { fetchFilterOptions } from "../api/client";
 import type { FilterOptions, FilterState } from "../api/types";
@@ -30,6 +30,16 @@ const CASCADE_KEYS: (keyof Omit<FilterOptions, "dateRange">)[] = [
 export function FiltersProvider({ children }: { children: ReactNode }) {
   const [options, setOptions] = useState<FilterOptions | null>(null);
   const filters = useFilters(options?.dateRange);
+
+  // Tracks the business/product/subProduct combo the date default was last
+  // computed for — fetch_date_range (server/queries.py) only narrows by
+  // those three, so a pure journey change re-runs this effect (it's in the
+  // dependency array below) without actually changing the valid date span,
+  // and shouldn't yank a manually-picked date back to "max" just because
+  // journey changed. `null` initially so the very first resolution (app
+  // load, still on the hardcoded DEFAULTS date) counts as "changed" too —
+  // see the effect below.
+  const comboKeyRef = useRef<string | null>(null);
 
   // FiltersProvider is mounted once, above the router's <Outlet/> (see
   // AppShell), so `filters` and `options` here are a single shared instance
@@ -75,19 +85,27 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // Same idea as the cascade correction above, but for the date picker:
       // business/product/subProduct narrow opts.dateRange (see
-      // FilterOptions.dateRange), and the currently selected date may now
-      // fall outside it — e.g. it was picked under a different business
-      // whose data spans a different window. Snap to the nearest bound
-      // (and move the calendar to that month) instead of leaving a date
-      // selected that this combination has no data for at all.
+      // FilterOptions.dateRange). When that combo actually changes, default
+      // the date to its most recent real day — "show me what's happening
+      // now" for whatever's newly selected, rather than leaving behind
+      // whatever date the previous combo happened to be looking at just
+      // because it's still technically in range. A pure journey/version/
+      // platform/month change (combo unchanged) leaves a manually-picked
+      // date alone, only clamping it if it's now genuinely out of bounds
+      // (e.g. the combo's own range shifted under it).
       const { min, max } = opts.dateRange;
-      const currentDate = filters.filters.date;
-      if (min && currentDate < min) {
-        filters.jumpToDate(min);
-      } else if (max && currentDate > max) {
-        filters.jumpToDate(max);
+      const comboKey = `${filters.filters.business}|${filters.filters.product}|${filters.filters.subProduct}`;
+      if (comboKeyRef.current !== comboKey) {
+        comboKeyRef.current = comboKey;
+        if (max) filters.jumpToDate(max);
+      } else {
+        const currentDate = filters.filters.date;
+        if (min && currentDate < min) {
+          filters.jumpToDate(min);
+        } else if (max && currentDate > max) {
+          filters.jumpToDate(max);
+        }
       }
     });
     // Only the four fields that actually drive the cascade belong here.

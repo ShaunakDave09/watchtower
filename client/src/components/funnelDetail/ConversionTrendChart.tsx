@@ -3,7 +3,13 @@ import type { TrendPoint } from "../../api/types";
 const W = 300;
 const H = 100;
 
-export default function ConversionTrendChart({ points }: { points: TrendPoint[] }) {
+export default function ConversionTrendChart({
+  points,
+  onClick,
+}: {
+  points: TrendPoint[];
+  onClick?: () => void;
+}) {
   const max = Math.max(...points.map((p) => p.value));
   const min = Math.min(...points.map((p) => p.value));
   const pad = (max - min) * 0.3 || 1;
@@ -21,7 +27,12 @@ export default function ConversionTrendChart({ points }: { points: TrendPoint[] 
   const linePoints = points.map((p, i) => toXY(i, p.value).join(",")).join(" ");
 
   return (
-    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-[22px]">
+    <div
+      onClick={onClick}
+      className={`rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-[22px] ${
+        onClick ? "cursor-pointer transition-shadow hover:shadow-[0_4px_16px_-8px_rgba(58,47,38,0.25)]" : ""
+      }`}
+    >
       <div className="mb-1 text-[15px] font-semibold text-[var(--color-ink)]">Conversion trend</div>
       <div className="mb-[14px] font-mono text-[10px] text-[var(--color-faint)]">END-TO-END · LAST 8 WEEKS</div>
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }}>

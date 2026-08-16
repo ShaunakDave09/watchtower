@@ -1,11 +1,11 @@
-import { useState } from "react";
 import type { ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import type { FunnelDetailData } from "../../api/types";
 import StagesTable from "./StagesTable";
 import DropoffReasons from "./DropoffReasons";
 import ConversionTrendChart from "./ConversionTrendChart";
 import ComparisonPanel from "./ComparisonPanel";
-import UserTable from "./UserTable";
+// import UserTable from "./UserTable";
 import FiltersButton from "../filters/FiltersButton";
 import FilterBar from "../overview/FilterBar";
 import FilterModal from "../overview/FilterModal";
@@ -56,7 +56,7 @@ export default function FunnelDetailView({
   onBack: () => void;
   headerActions?: ReactNode;
 }) {
-  const [platformTab, setPlatformTab] = useState<"All" | "App" | "Web">("All");
+  const navigate = useNavigate();
 
   return (
     <div className="px-7 py-[22px]">
@@ -80,20 +80,11 @@ export default function FunnelDetailView({
         </div>
         <div className="flex-1" />
         <div className="flex items-center gap-2">
+          {/* The All/App/Web platform toggle used to live here, duplicating
+              the Platform filter already in FilterModal (opened via
+              FiltersButton right below) — removed rather than keep two
+              controls for the same thing. */}
           <FiltersButton />
-          <div className="flex gap-[3px] rounded-[9px] border border-[var(--color-border-strong)] bg-[var(--color-accent-chip)] p-[3px]">
-            {(["All", "App", "Web"] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setPlatformTab(tab)}
-                className={`rounded-[7px] px-[14px] py-[7px] text-[12px] font-semibold transition-colors ${
-                  platformTab === tab ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-body)] hover:bg-[var(--color-border)]/50"
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
           {headerActions}
         </div>
       </div>
@@ -128,7 +119,7 @@ export default function FunnelDetailView({
         <StagesTable stages={data.stages} funnelName={data.name} />
         <div className="flex flex-col gap-4">
           <DropoffReasons stageLabel={data.dropoffReasons.stageLabel} reasons={data.dropoffReasons.reasons} />
-          <ConversionTrendChart points={data.trend} />
+          <ConversionTrendChart points={data.trend} onClick={() => navigate("/trends")} />
           <ComparisonPanel
             leftValue={data.comparison.app}
             rightValue={data.comparison.web}
@@ -138,12 +129,13 @@ export default function FunnelDetailView({
         </div>
       </div>
 
-      <UserTable
+      {/* Hidden for now (not deleted) — see the commented-out import above. */}
+      {/* <UserTable
         stageLabel={data.userTable.stageLabel}
         totalUsers={data.userTable.totalUsers}
         users={data.userTable.users}
         pageCount={data.userTable.pageCount}
-      />
+      /> */}
     </div>
   );
 }

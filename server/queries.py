@@ -29,7 +29,7 @@ MONTHLY_SUMMARY_TABLE = os.environ.get(
 # page (Hourly throughput, Today's pacing, and Hourly mode on the two daily
 # trend charts) — none of that existed for real until this table did.
 HOURLY_SUMMARY_TABLE = os.environ.get(
-    "HOURLY_SUMMARY_TABLE", "digital360.hourly_summary"
+    "HOURLY_SUMMARY_TABLE", "digital360.business_funnel_hourly"
 )
 
 # Sentinel for "don't filter on this field" — only offered for Journey and
