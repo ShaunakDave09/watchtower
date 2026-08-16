@@ -45,6 +45,7 @@
   "funnel": {
     "title": "Signup → Paid funnel",
     "convPct": "19.4%",
+    "totalStages": 5,
     "steps": [
       { "step": 1, "label": "Entrypoint", "users": 24810, "convPct": 100, "dropPct": null },
       { "step": 2, "label": "PDP Viewed", "users": 15380, "convPct": 62, "dropPct": 38 },

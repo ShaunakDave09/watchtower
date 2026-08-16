@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { fetchTrends } from "../api/client";
 import type { TrendsData } from "../api/types";
 import { useFiltersContext } from "../context/FiltersContext";
+import { fmtShort, shiftIsoDate } from "../hooks/useFilters";
 import Panel from "../components/ui/Panel";
 import HourlyThroughputChart from "../components/trends/HourlyThroughputChart";
 import PacingChart from "../components/trends/PacingChart";
@@ -91,6 +92,8 @@ function TrendPanel({
 
 export default function Trends() {
   const filters = useFiltersContext();
+  const todayLabel = fmtShort(filters.filters.date);
+  const yesterdayLabel = fmtShort(shiftIsoDate(filters.filters.date, -1));
   const [data, setData] = useState<TrendsData | null>(null);
   const [conversionMode, setConversionMode] = useState<TrendGranularity>("daily");
   const [stageMode, setStageMode] = useState<TrendGranularity>("daily");
@@ -179,8 +182,8 @@ export default function Trends() {
           <div className="mb-3 font-mono text-[10px] text-[var(--color-faint)]">CONVERSION RATE THROUGH CURRENT HOUR</div>
           <PacingChart pacing={data.pacing} />
           <div className="mt-2 flex items-center gap-[14px]">
-            <LegendDot color="var(--color-accent)" label="Today" />
-            <LegendDot color="var(--color-faint)" label="Same time yesterday" dashed />
+            <LegendDot color="var(--color-accent)" label={todayLabel} />
+            <LegendDot color="var(--color-faint)" label={`Same time ${yesterdayLabel}`} dashed />
           </div>
           <div className="mt-4 flex items-baseline gap-[9px]">
             <span className="text-[26px] font-bold text-[var(--color-ink)]">{data.pacing.nowValue}%</span>

@@ -4,7 +4,12 @@ import ChartTooltip from "../ui/ChartTooltip";
 
 const W = 340;
 const H = 150;
-const TOTAL_H = H + 10;
+// +10 for the "NOW" label drawn above the plot (y=-4, outside the 0..H
+// band — this is the outermost <svg> in the DOM, so it isn't covered by
+// the UA stylesheet's overflow:hidden default the way a nested
+// foreignObject/symbol/etc. would be); +24 more below for the new
+// x-axis hour labels.
+const TOTAL_H = H + 10 + 24;
 
 function hourLabel(i: number, currentHour: number) {
   if (i === currentHour) return "Now";
@@ -12,6 +17,18 @@ function hourLabel(i: number, currentHour: number) {
   const suffix = i < 12 ? "am" : "pm";
   return `${h}${suffix}`;
 }
+
+// Plain hour-of-day text, no "Now" special-casing — used for the fixed
+// x-axis ticks below the chart, which label real hours regardless of
+// where the "NOW" marker line happens to fall (unlike Hourly throughput's
+// chart, this one's x-axis spans the full 24h day even though "today"'s
+// actual line stops partway through it).
+function axisHourLabel(i: number) {
+  const h = i % 12 === 0 ? 12 : i % 12;
+  return `${h}${i < 12 ? "am" : "pm"}`;
+}
+
+const AXIS_TICK_HOURS = [0, 4, 8, 12, 16, 20, 23];
 
 export default function PacingChart({ pacing }: { pacing: TrendsData["pacing"] }) {
   const { today, yesterday, projection, currentHour } = pacing;
@@ -55,6 +72,19 @@ export default function PacingChart({ pacing }: { pacing: TrendsData["pacing"] }
             <circle cx={hover * step} cy={y(yesterday[hover])} r={3.2} fill="var(--color-faint)" />
           </>
         )}
+
+        <g fontFamily="'IBM Plex Mono',ui-monospace,monospace" fontSize={9.5} fill="var(--color-faint)">
+          {AXIS_TICK_HOURS.map((h) => (
+            <text
+              key={h}
+              x={h * step}
+              y={H + 16}
+              textAnchor={h === 0 ? "start" : h === AXIS_TICK_HOURS[AXIS_TICK_HOURS.length - 1] ? "end" : "middle"}
+            >
+              {axisHourLabel(h)}
+            </text>
+          ))}
+        </g>
 
         <g fill="transparent" style={{ pointerEvents: "all" }}>
           {Array.from({ length: n }, (_, i) => (

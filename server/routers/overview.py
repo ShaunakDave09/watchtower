@@ -151,10 +151,29 @@ def get_overview(
     # which is exactly the bug where changing filters looked like it did
     # nothing to the funnel.
     if steps is not None:
-        data["funnel"]["steps"] = steps
         if steps:
-            data["funnel"]["convPct"] = f"{steps[-1]['convPct']}%"
+            # The opportunity callout looks at the whole funnel, even
+            # though the panel it sits next to only charts the first 5
+            # stages below — it's a distinct insight card, not a caption
+            # for that chart, so a drop further down the funnel than what's
+            # visible there is still worth surfacing.
             opportunity = _build_opportunity(steps)
             if opportunity:
                 data["opportunity"] = opportunity
+
+        # Overview's funnel panel is a compact preview, not the full
+        # funnel — only STAGE_ORDER 0-4 (the first 5 stages) are charted
+        # here; the full breakdown is one click away on Funnel Detail
+        # (get_funnel_detail), which deliberately doesn't apply this
+        # truncation. `steps` is already ordered by STAGE_ORDER (see
+        # fetch_overview_funnel_steps/fetch_month_funnel_steps), so slicing
+        # the first 5 is equivalent to filtering STAGE_ORDER IN (0,1,2,3,4)
+        # without a second query. convPct is taken from *this* slice's own
+        # last stage so the "conv" badge next to the chart always matches
+        # what the chart actually ends on, not the true end-to-end number.
+        visible_steps = steps[:5]
+        data["funnel"]["steps"] = visible_steps
+        data["funnel"]["totalStages"] = len(steps)
+        if visible_steps:
+            data["funnel"]["convPct"] = f"{visible_steps[-1]['convPct']}%"
     return data
