@@ -104,9 +104,8 @@ export default function Overview() {
       <div className="px-7 pb-[4px] pt-[14px]">
         <div className="flex items-center gap-3">
           <div className="text-[20px] font-semibold tracking-[-0.01em] text-[var(--color-ink)]">
-            Growth overview
+            Digital360
           </div>
-          <div className="font-mono text-[12px] text-[var(--color-muted)]">{data.updatedLabel}</div>
           <div className="flex-1" />
           <FiltersButton />
         </div>
@@ -122,7 +121,7 @@ export default function Overview() {
 
       <div className="grid min-h-0 flex-1 grid-cols-[1.35fr_1fr] gap-3 px-7 pb-4 pt-2">
         <Panel
-          className="cursor-pointer overflow-hidden p-4 px-[18px] transition-shadow hover:shadow-[0_4px_16px_-8px_rgba(58,47,38,0.25)]"
+          className="cursor-pointer overflow-y-auto p-4 px-[18px] transition-shadow hover:shadow-[0_4px_16px_-8px_rgba(58,47,38,0.25)]"
           onClick={() => navigate("/funnels/guest-checkout")}
         >
           <div className="mb-2 flex items-baseline gap-[10px]">
@@ -131,6 +130,13 @@ export default function Overview() {
             <div className="font-mono text-[11px] text-[var(--color-muted)]">conv</div>
             <div className="text-[16px] font-bold text-[var(--color-accent)]">{data.funnel.convPct}</div>
           </div>
+          {/* overflow-y-auto (not -hidden) on the Panel above: this funnel's
+              stage count is data-driven and can run well past the handful
+              the fixed-height left column was originally sized for (up to
+              13 stages for some filter combos) — FunnelChart's SVG grows
+              taller with each stage, and clipping it via overflow-hidden
+              silently hid the bottom of the funnel instead of letting the
+              panel scroll to it. */}
           <FunnelChart steps={data.funnel.steps} />
           <div className="mt-1 font-mono text-[11px] text-[var(--color-faint)]">Click to view full 13-stage breakdown →</div>
         </Panel>

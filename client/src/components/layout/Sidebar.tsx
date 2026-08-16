@@ -97,7 +97,7 @@ export default function Sidebar() {
 
   return (
     <div
-      className={`relative flex ${collapsed ? "w-[72px]" : "w-[270px]"} flex-none flex-col border-r border-[var(--color-border)] bg-[var(--color-card)] px-[14px] py-[18px] transition-[width] duration-200`}
+      className={`sticky top-0 flex h-screen ${collapsed ? "w-[72px]" : "w-[270px]"} flex-none flex-col self-start overflow-y-auto rounded-[12px] border-r border-[var(--color-border)] bg-[var(--color-card)] px-[14px] py-[18px] transition-[width] duration-200`}
     >
       <button
         onClick={() => setCollapsed((c) => !c)}
@@ -137,35 +137,18 @@ export default function Sidebar() {
         <NavRow to="/funnels/guest-checkout" icon="funnels" label="Funnels" collapsed={collapsed} />
         <NavRow to="/trends" icon="trends" label="Trends" collapsed={collapsed} />
         <NavRow to="/funnels/guest-checkout/entrypoints" icon="entrypoints" label="Entrypoint Performance" collapsed={collapsed} />
-        <NavRow icon="cohorts" label="Cohorts" collapsed={collapsed} />
-        <NavRow to="/alerts" icon="alerts" label="Alerts" badge="3" collapsed={collapsed} />
       </div>
 
-      {!collapsed && (
-        <div className="px-[11px] pb-2 pt-5 font-mono text-[9.5px] tracking-[0.08em] text-[var(--color-faint)]">
-          WORKSPACE
-        </div>
-      )}
-      <div className={`flex flex-col gap-[3px] ${collapsed ? "pt-5" : ""}`}>
-        <NavRow icon="integrations" label="Integrations" collapsed={collapsed} />
-        <NavRow icon="settings" label="Settings" collapsed={collapsed} />
+      {/* Cohorts/Alerts (ANALYZE) and Integrations/Settings/user identity
+          (WORKSPACE) are hidden for now — not deleted, since these are
+          still real nav destinations, just not ones this app should
+          surface yet. Dark/Light mode is the one WORKSPACE item that's
+          actually functional, so it's the only one left rendered. */}
+      <div className={`flex flex-col gap-[3px] ${collapsed ? "pt-5" : "pt-2"}`}>
         <ThemeToggle collapsed={collapsed} />
       </div>
 
       <div className="flex-1" />
-
-      <div
-        className={`mt-[14px] flex items-center gap-[10px] border-t border-[var(--color-border)] pb-1 pt-[11px] ${collapsed ? "justify-center px-0" : "px-[10px]"}`}
-      >
-        <div className="h-8 w-8 flex-none rounded-full border border-[var(--color-border-strong)] bg-[var(--color-border-strong)]" />
-        {!collapsed && (
-          <div className="min-w-0">
-            <div className="truncate text-[13px] font-medium text-[var(--color-ink)]">
-              Anurag Chottani
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   );
 }

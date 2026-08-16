@@ -78,6 +78,32 @@ def _with_all_option(options: dict) -> dict:
     }
 
 
+def _build_opportunity(steps: list[dict]) -> Optional[dict]:
+    """Whichever stage-to-stage transition lost the most users (by
+    dropPct), framed as a recovery opportunity — same "find the biggest
+    swing" shape as insights.py's comparison callout, just phrased as
+    "recovering half of this drop" instead of a gainer/decliner. None
+    (leaving the fixture's opportunity text) if there's no real drop to
+    point to.
+    """
+    candidates = [i for i in range(1, len(steps)) if steps[i].get("dropPct")]
+    if not candidates:
+        return None
+    worst_i = max(candidates, key=lambda i: steps[i]["dropPct"])
+    prev, worst = steps[worst_i - 1], steps[worst_i]
+    lost = prev["users"] - worst["users"]
+    if lost <= 0:
+        return None
+    recovered = round(lost / 2)
+    return {
+        "label": "BIGGEST OPPORTUNITY",
+        "html": (
+            f'Recovering half of the <b style="color:#e88a5f">{prev["label"]} → {worst["label"]}</b> drop '
+            f'would add <b style="color:#e88a5f">~{recovered:,}</b> more users reaching {worst["label"]}.'
+        ),
+    }
+
+
 @router.get("/overview")
 def get_overview(
     business: str = Query(...),
@@ -90,8 +116,16 @@ def get_overview(
     date: str = Query(...),
 ) -> dict:
     data = json.loads((FIXTURES_DIR / "overview.json").read_text())
-    # kpis/retention/timeToConvert/opportunity stay on fixtures for now —
-    # horizontal_summary_daily only backs the funnel stage breakdown.
+
+    # name/meta-style fix, same as get_funnel_detail: the fixture's funnel
+    # title ("Signup -> Paid funnel") never reflected the applied filters —
+    # rebuild it from `product` regardless of whether the steps query below
+    # succeeds, since it doesn't depend on that data.
+    data["funnel"]["title"] = f"{product} funnel"
+
+    # kpis/retention/timeToConvert stay on fixtures for now —
+    # horizontal_summary_daily only backs the funnel stage breakdown (and,
+    # from it, the opportunity callout below).
     try:
         steps = queries.fetch_funnel_steps(
             business=business,
@@ -118,4 +152,9 @@ def get_overview(
     # nothing to the funnel.
     if steps is not None:
         data["funnel"]["steps"] = steps
+        if steps:
+            data["funnel"]["convPct"] = f"{steps[-1]['convPct']}%"
+            opportunity = _build_opportunity(steps)
+            if opportunity:
+                data["opportunity"] = opportunity
     return data
