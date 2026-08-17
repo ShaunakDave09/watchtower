@@ -48,11 +48,21 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
   // this provider. That's what makes filters "carry forward" across pages
   // automatically: there's nothing page-specific to sync.
   useEffect(() => {
+    // Reads `draft`, not `filters` (applied): this cascade needs to track
+    // whatever's currently being edited in the modal — Product's option
+    // list should narrow the moment Business is changed there, not only
+    // after Apply is clicked — while the corrections it computes still
+    // write through to *both* draft and applied immediately (correctField/
+    // correctDate) rather than waiting on Apply, since a stale/invalid
+    // default is the app fixing itself, not a pending user edit. Before
+    // the modal's ever been opened, draft and filters are the same object
+    // anyway (see useFilters), so this behaves identically to reading
+    // `filters` at mount time / everywhere outside the modal.
     fetchFilterOptions({
-      business: filters.filters.business,
-      product: filters.filters.product,
-      subProduct: filters.filters.subProduct,
-      journey: filters.filters.journey,
+      business: filters.draft.business,
+      product: filters.draft.product,
+      subProduct: filters.draft.subProduct,
+      journey: filters.draft.journey,
     }).then((opts) => {
       setOptions(opts);
 
@@ -66,7 +76,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
       // field's first real option, then stop.
       //
       // Only fixing one level per pass (instead of all of them at once) is
-      // deliberate: correcting `product` changes `filters.filters.product`,
+      // deliberate: correcting `product` changes `filters.draft.product`,
       // which re-triggers this same effect (it's in the dependency array
       // below) with the corrected upstream value — and *that* re-fetch is
       // what produces a trustworthy subProduct list to validate against
@@ -78,9 +88,9 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
       // against options that reflect the correction before it.
       for (const key of CASCADE_KEYS) {
         const validValues = opts[key];
-        const current = filters.filters[key as keyof FilterState];
+        const current = filters.draft[key as keyof FilterState];
         if (validValues.length > 0 && !validValues.includes(current)) {
-          filters.set(key as keyof FilterState, validValues[0]);
+          filters.correctField(key as keyof FilterState, validValues[0]);
           break;
         }
       }
@@ -95,25 +105,26 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
       // date alone, only clamping it if it's now genuinely out of bounds
       // (e.g. the combo's own range shifted under it).
       const { min, max } = opts.dateRange;
-      const comboKey = `${filters.filters.business}|${filters.filters.product}|${filters.filters.subProduct}`;
+      const comboKey = `${filters.draft.business}|${filters.draft.product}|${filters.draft.subProduct}`;
       if (comboKeyRef.current !== comboKey) {
         comboKeyRef.current = comboKey;
-        if (max) filters.jumpToDate(max);
+        if (max) filters.correctDate(max);
       } else {
-        const currentDate = filters.filters.date;
+        const currentDate = filters.draft.date;
         if (min && currentDate < min) {
-          filters.jumpToDate(min);
+          filters.correctDate(min);
         } else if (max && currentDate > max) {
-          filters.jumpToDate(max);
+          filters.correctDate(max);
         }
       }
     });
     // Only the four fields that actually drive the cascade belong here.
-    // `filters.set` and `filters.filters` (whole object) are intentionally
-    // excluded — including them would refetch on every keystroke-equivalent
-    // change (platform, date range) that the cascade doesn't care about.
+    // `filters.set`/`filters.correctField` and the whole `draft`/`filters`
+    // objects are intentionally excluded — including them would refetch on
+    // every keystroke-equivalent change (platform, date range) that the
+    // cascade doesn't care about.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.filters.business, filters.filters.product, filters.filters.subProduct, filters.filters.journey]);
+  }, [filters.draft.business, filters.draft.product, filters.draft.subProduct, filters.draft.journey]);
 
   return <FiltersContext.Provider value={{ ...filters, options }}>{children}</FiltersContext.Provider>;
 }

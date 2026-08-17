@@ -40,7 +40,7 @@ function FieldSelect({
 
 export default function FilterModal() {
   const filters = useFiltersContext();
-  const { options } = filters;
+  const { options, draft } = filters;
   if (!filters.open || !options) return null;
 
   const segBase =
@@ -48,7 +48,7 @@ export default function FilterModal() {
 
   return (
     <div
-      onClick={() => filters.setOpen(false)}
+      onClick={filters.cancelEdits}
       className="fixed inset-0 z-[100] flex items-start justify-center bg-[rgba(42,32,24,0.5)] p-6 pt-0"
     >
       <div
@@ -69,7 +69,7 @@ export default function FilterModal() {
           </div>
           <div className="flex-1" />
           <button
-            onClick={() => filters.setOpen(false)}
+            onClick={filters.cancelEdits}
             className="flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-card)] text-[15px] leading-none text-[var(--color-body)] hover:bg-[var(--color-accent-soft)]"
           >
             ✕
@@ -81,13 +81,17 @@ export default function FilterModal() {
               selected-date readout) as an even 2-column, 4-row grid.
               Right: the calendar itself, one column wide, stretching to
               match this grid's full height (grid items stretch by
-              default) instead of a fixed-height box floating beside it. */}
+              default) instead of a fixed-height box floating beside it.
+              Every field here reads/writes `draft`, not `filters` — none
+              of it reaches any page's data until "Apply filters" commits
+              it (see useFilters.ts), so picking (or re-picking) a value
+              here never fires a page-data request on its own. */}
           <div className="grid grid-cols-2 gap-x-4 gap-y-[15px]">
-            <FieldSelect label="BUSINESS" value={filters.filters.business} options={options.business} onChange={(v) => filters.set("business", v)} />
-            <FieldSelect label="PRODUCT" value={filters.filters.product} options={options.product} onChange={(v) => filters.set("product", v)} />
-            <FieldSelect label="SUB-PRODUCT" value={filters.filters.subProduct} options={options.subProduct} onChange={(v) => filters.set("subProduct", v)} />
-            <FieldSelect label="JOURNEY" value={filters.filters.journey} options={options.journey} onChange={(v) => filters.set("journey", v)} />
-            <FieldSelect label="VERSION" value={filters.filters.version} options={options.version} onChange={(v) => filters.set("version", v)} />
+            <FieldSelect label="BUSINESS" value={draft.business} options={options.business} onChange={(v) => filters.set("business", v)} />
+            <FieldSelect label="PRODUCT" value={draft.product} options={options.product} onChange={(v) => filters.set("product", v)} />
+            <FieldSelect label="SUB-PRODUCT" value={draft.subProduct} options={options.subProduct} onChange={(v) => filters.set("subProduct", v)} />
+            <FieldSelect label="JOURNEY" value={draft.journey} options={options.journey} onChange={(v) => filters.set("journey", v)} />
+            <FieldSelect label="VERSION" value={draft.version} options={options.version} onChange={(v) => filters.set("version", v)} />
 
             <div>
               <span className="mb-[5px] block font-mono text-[10px] tracking-[0.05em] text-[var(--color-muted)]">
@@ -96,13 +100,13 @@ export default function FilterModal() {
               <div className="flex gap-1 rounded-[9px] border border-[var(--color-border-strong)] bg-[var(--color-accent-chip)] p-[3px]">
                 <button
                   onClick={() => filters.set("platform", "App")}
-                  className={`${segBase} ${filters.filters.platform === "App" ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-body)]"}`}
+                  className={`${segBase} ${draft.platform === "App" ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-body)]"}`}
                 >
                   App
                 </button>
                 <button
                   onClick={() => filters.set("platform", "Web")}
-                  className={`${segBase} ${filters.filters.platform === "Web" ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-body)]"}`}
+                  className={`${segBase} ${draft.platform === "Web" ? "bg-[var(--color-accent)] text-white" : "text-[var(--color-body)]"}`}
                 >
                   Web
                 </button>
@@ -111,7 +115,7 @@ export default function FilterModal() {
 
             <FieldSelect
               label="MONTH"
-              value={filters.filters.month}
+              value={draft.month}
               options={options.month}
               onChange={(v) => filters.set("month", v)}
               formatOption={fmtMonth}
@@ -145,13 +149,13 @@ export default function FilterModal() {
           </button>
           <div className="flex-1" />
           <button
-            onClick={() => filters.setOpen(false)}
+            onClick={filters.cancelEdits}
             className="rounded-[9px] border border-[var(--color-border-strong)] bg-[var(--color-card)] px-[18px] py-[9px] text-[13px] font-medium text-[var(--color-body)]"
           >
             Cancel
           </button>
           <button
-            onClick={() => filters.setOpen(false)}
+            onClick={filters.applyFilters}
             className="rounded-[9px] bg-[var(--color-accent)] px-5 py-[9px] text-[13px] font-semibold text-white hover:bg-[var(--color-accent-hover)]"
           >
             Apply filters
