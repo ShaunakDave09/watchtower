@@ -15,12 +15,17 @@ export default function EntrypointSourceDetail() {
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    // Hold off until the filter cascade has validated the selection —
+    // fetching for the provisional DEFAULTS and then again for the
+    // corrected values doubled every cold load's requests (see
+    // FiltersContext's `ready`).
+    if (!filters.ready) return;
     setError(null);
     fetchEntrypointSourceDetail(funnelId, sourceId, filters.filters)
       .then(setData)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [funnelId, sourceId, filters.filters, reloadKey]);
+  }, [funnelId, sourceId, filters.ready, filters.filters, reloadKey]);
 
   if (error) {
     return <LoadError message={error} onRetry={() => setReloadKey((k) => k + 1)} />;

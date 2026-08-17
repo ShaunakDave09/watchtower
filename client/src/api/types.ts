@@ -21,7 +21,23 @@ export interface FilterOptions {
   // server/queries.py's fetch_date_range) — bounds the date picker so it
   // can't be used to pick a day this combination has no data for at all.
   dateRange: DateRange;
+  // The selection the server resolved these option lists against: every
+  // cascade field validated top-down and corrected where the caller's value
+  // didn't exist under its (already-corrected) parent. The client applies
+  // this in one atomic update instead of fixing one field per response and
+  // re-requesting — see FiltersContext. `null` when the cascade query
+  // itself failed and `options` came from the fixture fallback, which has no
+  // authority to correct anyone's selection.
+  selection: ResolvedFilterSelection | null;
 }
+
+// The cascade fields only — `platform` and `date` aren't part of the
+// cascade (nothing narrows them, and they narrow nothing), so the server
+// never has an opinion about them.
+export type ResolvedFilterSelection = Pick<
+  FilterState,
+  "business" | "product" | "subProduct" | "journey" | "version" | "month"
+>;
 
 // Sentinel meaning "don't filter on this field" — must match server/queries.py's
 // ALL_VALUE exactly, since it's sent as a literal query param value. Only
@@ -29,14 +45,16 @@ export interface FilterOptions {
 // other field always narrows the data, so it always needs one real pick.
 export const ALL_FILTER_VALUE = "All";
 
-// What's currently picked for the upstream fields in the filter cascade
-// (business -> product -> subProduct -> journey -> version). Passed to
+// What's currently picked for the fields in the filter cascade. Passed to
 // fetchFilterOptions so the backend can narrow each field's dropdown to
-// values that actually co-occur with what's already selected above it.
-// `version` never appears here — nothing comes after it to narrow. `month`
-// never appears here either — it isn't part of this cascade at all (see
-// FilterOptions.month above).
-export type FilterSelection = Pick<FilterState, "business" | "product" | "subProduct" | "journey">;
+// values that actually co-occur with what's already selected above it — and,
+// since the same call now also validates the whole selection and hands back
+// a corrected one, so it can check `version`/`month` too even though neither
+// narrows anything downstream.
+export type FilterSelection = Pick<
+  FilterState,
+  "business" | "product" | "subProduct" | "journey" | "version" | "month"
+>;
 
 export interface FilterState {
   business: string;

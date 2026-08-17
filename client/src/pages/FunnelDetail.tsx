@@ -15,6 +15,11 @@ export default function FunnelDetail() {
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    // Hold off until the filter cascade has validated the selection —
+    // fetching for the provisional DEFAULTS and then again for the
+    // corrected values doubled every cold load's requests (see
+    // FiltersContext's `ready`).
+    if (!filters.ready) return;
     setError(null);
     fetchFunnelDetail(funnelId ?? "guest-checkout", filters.filters)
       .then(setData)
@@ -24,7 +29,7 @@ export default function FunnelDetail() {
     // Filters button/bar on this page shows as active — same dependency
     // shape as Overview's fetch effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [funnelId, filters.filters, reloadKey]);
+  }, [funnelId, filters.ready, filters.filters, reloadKey]);
 
   if (error) {
     return <LoadError message={error} onRetry={() => setReloadKey((k) => k + 1)} />;

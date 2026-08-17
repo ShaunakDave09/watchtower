@@ -33,11 +33,28 @@ def get_filters(
     product: Optional[str] = Query(None),
     sub_product: Optional[str] = Query(None, alias="subProduct"),
     journey: Optional[str] = Query(None),
+    # version/month aren't part of the narrowing cascade (nothing comes after
+    # version; month is a different table entirely) but they're still
+    # *validated* against it, so they have to come in for the response's
+    # `selection` to be a complete answer the client can apply in one go.
+    version: Optional[str] = Query(None),
+    month: Optional[str] = Query(None),
 ) -> dict:
+    # None means "the cascade query failed" — the fixture fallback below has
+    # no authority to correct anyone's selection, so the client is told to
+    # keep whatever it already had rather than being handed values derived
+    # from data that isn't the warehouse's.
+    selection: Optional[dict] = None
     try:
-        options = queries.fetch_filter_options(
-            business=business, product=product, sub_product=sub_product, journey=journey
+        resolved = queries.fetch_filter_options(
+            business=business,
+            product=product,
+            sub_product=sub_product,
+            journey=journey,
+            version=version,
         )
+        options = resolved["options"]
+        selection = resolved["selection"]
     except Exception:
         # Only a genuine failure to run the query (DB unreachable, bad
         # credentials, etc.) falls back to the fixture. A query that runs
@@ -55,20 +72,35 @@ def get_filters(
     except Exception:
         logger.exception("fetch_month_options failed, falling back to fixture months")
         options["month"] = json.loads((FIXTURES_DIR / "filters.json").read_text())["month"]
+    # Month is corrected here rather than in fetch_filter_options because its
+    # options come from the monthly table, not the daily one the cascade
+    # walks — but it's corrected the same way, and only when the cascade
+    # itself succeeded (see `selection` above).
+    if selection is not None:
+        selection["month"] = queries.correct_selection("month", month, options["month"])
     try:
         # Bounds the date picker to the selected business/product/sub_product's
-        # actual DATE span — nothing to compute yet if the caller hasn't
-        # picked all three (e.g. the very first call before defaults settle).
-        if business and product and sub_product:
+        # actual DATE span. Keyed off the *corrected* selection, not the raw
+        # query params: if the caller sent a product that doesn't exist under
+        # its business, the range for the corrected product is the one that
+        # matches the options being returned alongside it. Falls back to the
+        # raw params when the cascade query failed (nothing corrected them),
+        # and to an empty range when all three still aren't known — e.g. the
+        # very first call, before any defaults have settled.
+        effective = selection or {}
+        range_business = effective.get("business") or business
+        range_product = effective.get("product") or product
+        range_sub_product = effective.get("subProduct") or sub_product
+        if range_business and range_product and range_sub_product:
             options["dateRange"] = queries.fetch_date_range(
-                business=business, product=product, sub_product=sub_product
+                business=range_business, product=range_product, sub_product=range_sub_product
             )
         else:
             options["dateRange"] = {"min": None, "max": None}
     except Exception:
         logger.exception("fetch_date_range failed, falling back to fixture date range")
         options["dateRange"] = json.loads((FIXTURES_DIR / "filters.json").read_text())["dateRange"]
-    return _with_all_option(options)
+    return {**_with_all_option(options), "selection": selection}
 
 
 # Journey, Version, and Month are the only fields the filter panel lets you

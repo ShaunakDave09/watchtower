@@ -63,13 +63,19 @@ export default function Overview() {
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
+  // `filters.ready` gates every fetch on this page: until the cascade has
+  // validated the selection against the warehouse, `filters.filters` is just
+  // the hardcoded DEFAULTS, and fetching for it only to refetch for the
+  // corrected values a moment later is what made a cold load fire each of
+  // these endpoints two or three times over (see FiltersContext).
   useEffect(() => {
+    if (!filters.ready) return;
     setError(null);
     fetchOverview(filters.filters)
       .then(setData)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.filters, reloadKey]);
+  }, [filters.ready, filters.filters, reloadKey]);
 
   // /api/trends takes the same filters as everywhere else, but this panel
   // only ever reads `pacing` off the response — hourly/pacing have no
@@ -81,18 +87,20 @@ export default function Overview() {
   // LoadError): these two panels are a bonus on top of the main Overview
   // data, not load-bearing for the page the way `data` is.
   useEffect(() => {
+    if (!filters.ready) return;
     fetchTrends(filters.filters)
       .then(setTrends)
       .catch((e) => console.error("Failed to load trends for Today's pacing panel", e));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.filters]);
+  }, [filters.ready, filters.filters]);
 
   useEffect(() => {
+    if (!filters.ready) return;
     fetchFunnelEntrypoints(OVERVIEW_FUNNEL_ID, filters.filters)
       .then(setEntrypoints)
       .catch((e) => console.error("Failed to load entrypoints for comparison panel", e));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.filters]);
+  }, [filters.ready, filters.filters]);
 
   if (error) {
     return <LoadError message={error} onRetry={() => setReloadKey((k) => k + 1)} />;
