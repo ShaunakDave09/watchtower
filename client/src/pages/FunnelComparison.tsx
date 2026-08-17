@@ -56,6 +56,11 @@ export default function FunnelComparison() {
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    // Hold off until the filter cascade has validated the selection —
+    // fetching for the provisional DEFAULTS and then again for the
+    // corrected values doubled every cold load's requests (see
+    // FiltersContext's `ready`).
+    if (!filters.ready) return;
     setError(null);
     fetchFunnelComparison(funnelId, filters.filters, compare)
       .then(setData)
@@ -65,7 +70,7 @@ export default function FunnelComparison() {
     // changes — same dependency shape as Funnel Detail's fetch effect (see
     // FunnelDetail.tsx).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [funnelId, filters.filters, compare, reloadKey]);
+  }, [funnelId, filters.ready, filters.filters, compare, reloadKey]);
 
   if (error) {
     return <LoadError message={error} onRetry={() => setReloadKey((k) => k + 1)} />;

@@ -160,6 +160,11 @@ export default function Trends() {
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    // Hold off until the filter cascade has validated the selection —
+    // fetching for the provisional DEFAULTS and then again for the
+    // corrected values doubled every cold load's requests (see
+    // FiltersContext's `ready`).
+    if (!filters.ready) return;
     setError(null);
     fetchTrends(filters.filters)
       .then(setData)
@@ -169,7 +174,7 @@ export default function Trends() {
     // FunnelDetail.tsx). The trend windows themselves are fixed server-side
     // (see get_trends), not user-picked ranges.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.filters, reloadKey]);
+  }, [filters.ready, filters.filters, reloadKey]);
 
   const conversionTrend = conversionMode === "daily" ? data?.conversionTrend : data?.hourlyConversionTrend;
   const stageTrend = stageMode === "daily" ? data?.stageTrend : data?.hourlyStageTrend;

@@ -1,34 +1,45 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { fetchFilterOptions } from "../api/client";
-import type { FilterOptions, FilterState } from "../api/types";
+import type { FilterOptions, FilterSelection, FilterState } from "../api/types";
 import { useFilters } from "../hooks/useFilters";
 import type { UseFiltersReturn } from "../hooks/useFilters";
 
 interface FiltersContextValue extends UseFiltersReturn {
   options: FilterOptions | null;
+  // False until the cascade has resolved once, i.e. until `filters` has been
+  // validated against the warehouse rather than being the hardcoded DEFAULTS.
+  // Pages gate their own fetches on this so they don't request data for a
+  // provisional selection and then immediately request it again for the
+  // corrected one — on a cold load that was two or three rounds of every
+  // page endpoint, all racing the cascade for the browser's handful of
+  // per-origin connections. Set even when the cascade *fails* (fixture
+  // fallback), so a backend problem degrades to "pages load with defaults"
+  // rather than "pages never load".
+  ready: boolean;
 }
 
 const FiltersContext = createContext<FiltersContextValue | null>(null);
 
-// Cascade order: business -> product -> subProduct -> journey -> version.
-// Each field's real options only make sense given whatever's picked above
-// it, so this is also the order we check for (and correct) an invalid
-// selection in — see the effect below. `month` is appended even though it
-// isn't part of this cascade (nothing narrows it, and it narrows nothing
-// downstream) purely so a stale/removed month selection still gets snapped
-// back to a real option whenever this correction pass happens to run.
-const CASCADE_KEYS: (keyof Omit<FilterOptions, "dateRange">)[] = [
-  "business",
-  "product",
-  "subProduct",
-  "journey",
-  "version",
-  "month",
-];
+// Identity of a cascade request: two drafts with the same key resolve to the
+// same options and the same corrected selection, so there's no reason to ask
+// the server twice. Used both to skip redundant fetches and — once a response
+// comes back — to recognize that the corrected selection it carries is
+// already fully resolved and must not trigger a follow-up request.
+function cascadeKey(selection: Partial<FilterSelection>): string {
+  return [
+    selection.business,
+    selection.product,
+    selection.subProduct,
+    selection.journey,
+    selection.version,
+    selection.month,
+  ].join("|");
+}
 
 export function FiltersProvider({ children }: { children: ReactNode }) {
   const [options, setOptions] = useState<FilterOptions | null>(null);
+  const [ready, setReady] = useState(false);
   const filters = useFilters(options?.dateRange);
 
   // Tracks the business/product/subProduct combo the date default was last
@@ -41,6 +52,20 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
   // see the effect below.
   const comboKeyRef = useRef<string | null>(null);
 
+  // The cascade key we've already fully resolved. Set from the *corrected*
+  // selection in each response, which is what stops the effect from chasing
+  // its own tail: applying a correction changes `draft`, which re-runs this
+  // effect, and without this the re-run would fire a second request whose
+  // answer we already have.
+  const resolvedKeyRef = useRef<string | null>(null);
+
+  // Monotonic request id. Only the newest request is allowed to write state —
+  // an older reply that lands late must not call setOptions()/apply a
+  // selection derived from a business the user has since moved off, which
+  // would "correct" the current draft against the wrong option lists and
+  // kick off yet another request.
+  const requestSeqRef = useRef(0);
+
   // FiltersProvider is mounted once, above the router's <Outlet/> (see
   // AppShell), so `filters` and `options` here are a single shared instance
   // for the whole app — every page's FilterModal/FilterBar reads and writes
@@ -48,85 +73,102 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
   // this provider. That's what makes filters "carry forward" across pages
   // automatically: there's nothing page-specific to sync.
   useEffect(() => {
-    // Reads `draft`, not `filters` (applied): this cascade needs to track
-    // whatever's currently being edited in the modal — Product's option
-    // list should narrow the moment Business is changed there, not only
-    // after Apply is clicked — while the corrections it computes still
-    // write through to *both* draft and applied immediately (correctField/
-    // correctDate) rather than waiting on Apply, since a stale/invalid
-    // default is the app fixing itself, not a pending user edit. Before
-    // the modal's ever been opened, draft and filters are the same object
-    // anyway (see useFilters), so this behaves identically to reading
-    // `filters` at mount time / everywhere outside the modal.
-    fetchFilterOptions({
+    // Reads `draft`, not `filters` (applied): the cascade has to track
+    // whatever's being edited in the modal — Product's option list should
+    // narrow the moment Business changes there, not only after Apply. Before
+    // the modal's ever been opened the two are identical (see useFilters),
+    // so this behaves the same as reading `filters` everywhere else.
+    const requested: FilterSelection = {
       business: filters.draft.business,
       product: filters.draft.product,
       subProduct: filters.draft.subProduct,
       journey: filters.draft.journey,
-    }).then((opts) => {
-      setOptions(opts);
+      version: filters.draft.version,
+      month: filters.draft.month,
+    };
+    const requestedKey = cascadeKey(requested);
+    // Already resolved — this run is the echo of our own correction landing
+    // in `draft`, not a new user selection.
+    if (resolvedKeyRef.current === requestedKey) return;
 
-      // Cascading correction: business/product/subProduct/journey/version
-      // were all picked before we knew what the real data actually
-      // contains (either the hardcoded starting DEFAULTS, or a value that
-      // was valid under a since-changed upstream field — e.g. switching
-      // business away from the one a previously-picked product belonged
-      // to). Walk the cascade top-down and snap the *first* field whose
-      // current value isn't among its freshly-fetched options to that
-      // field's first real option, then stop.
-      //
-      // Only fixing one level per pass (instead of all of them at once) is
-      // deliberate: correcting `product` changes `filters.draft.product`,
-      // which re-triggers this same effect (it's in the dependency array
-      // below) with the corrected upstream value — and *that* re-fetch is
-      // what produces a trustworthy subProduct list to validate against
-      // next. Correcting subProduct in this same pass would validate it
-      // against a list that was fetched using the *old*, since-replaced
-      // product, which could easily approve a combination that doesn't
-      // actually exist. Re-running the effect per level is an extra
-      // request or two, but it's the only way each correction is checked
-      // against options that reflect the correction before it.
-      for (const key of CASCADE_KEYS) {
-        const validValues = opts[key];
-        const current = filters.draft[key as keyof FilterState];
-        if (validValues.length > 0 && !validValues.includes(current)) {
-          filters.correctField(key as keyof FilterState, validValues[0]);
-          break;
-        }
-      }
+    const controller = new AbortController();
+    const seq = ++requestSeqRef.current;
 
-      // business/product/subProduct narrow opts.dateRange (see
-      // FilterOptions.dateRange). When that combo actually changes, default
-      // the date to its most recent real day — "show me what's happening
-      // now" for whatever's newly selected, rather than leaving behind
-      // whatever date the previous combo happened to be looking at just
-      // because it's still technically in range. A pure journey/version/
-      // platform/month change (combo unchanged) leaves a manually-picked
-      // date alone, only clamping it if it's now genuinely out of bounds
-      // (e.g. the combo's own range shifted under it).
-      const { min, max } = opts.dateRange;
-      const comboKey = `${filters.draft.business}|${filters.draft.product}|${filters.draft.subProduct}`;
-      if (comboKeyRef.current !== comboKey) {
-        comboKeyRef.current = comboKey;
-        if (max) filters.correctDate(max);
-      } else {
-        const currentDate = filters.draft.date;
-        if (min && currentDate < min) {
-          filters.correctDate(min);
-        } else if (max && currentDate > max) {
-          filters.correctDate(max);
+    fetchFilterOptions(requested, controller.signal)
+      .then((opts) => {
+        if (seq !== requestSeqRef.current) return; // superseded mid-flight
+        setOptions(opts);
+
+        // The server resolved the whole cascade in this one response:
+        // business/product/subProduct/journey/version/month each validated
+        // against options computed from the already-corrected fields above
+        // it (see fetch_filter_options). Previously the client did that
+        // itself, one field per response, re-requesting after each fix — so
+        // changing a business meant a serial chain of round trips and the
+        // product list stayed wrong until the second reply came back.
+        //
+        // `selection` is null only when the cascade query failed and `opts`
+        // is the fixture fallback; that has no authority to correct
+        // anything, so the draft is left exactly as the user had it.
+        const corrected: Partial<FilterState> = { ...(opts.selection ?? {}) };
+
+        // business/product/subProduct narrow opts.dateRange (see
+        // FilterOptions.dateRange). When that combo actually changes,
+        // default the date to its most recent real day — "show me what's
+        // happening now" for whatever's newly selected, rather than keeping
+        // whatever date the previous combo happened to be on just because
+        // it's still technically in range. A pure journey/version/platform/
+        // month change (combo unchanged) leaves a manually-picked date
+        // alone, only clamping it if it's now genuinely out of bounds.
+        const { min, max } = opts.dateRange;
+        const settled = { ...requested, ...corrected };
+        const comboKey = `${settled.business}|${settled.product}|${settled.subProduct}`;
+        if (comboKeyRef.current !== comboKey) {
+          comboKeyRef.current = comboKey;
+          if (max) corrected.date = max;
+        } else {
+          const currentDate = filters.draft.date;
+          if (min && currentDate < min) corrected.date = min;
+          else if (max && currentDate > max) corrected.date = max;
         }
-      }
-    });
-    // Only the four fields that actually drive the cascade belong here.
-    // `filters.set`/`filters.correctField` and the whole `draft`/`filters`
-    // objects are intentionally excluded — including them would refetch on
-    // every keystroke-equivalent change (platform, date range) that the
-    // cascade doesn't care about.
+
+        // Mark the corrected selection resolved *before* applying it, so the
+        // re-run this triggers sees a matching key and returns immediately
+        // instead of issuing a redundant request. One user action, one
+        // request — that's what keeps clicks from stacking up.
+        resolvedKeyRef.current = cascadeKey(settled);
+        filters.applyResolvedSelection(corrected);
+        setReady(true);
+      })
+      .catch((e) => {
+        // An abort is this effect doing its job (a newer selection replaced
+        // this request), not a failure worth reporting — and crucially not a
+        // reason to unblock the pages, since a newer request is already in
+        // flight and will do it.
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        console.error("Failed to load filter options", e);
+        // Couldn't validate the selection at all. Let the pages fetch with
+        // what they have rather than leaving the whole app on "Loading…".
+        setReady(true);
+      });
+
+    return () => controller.abort();
+    // Only the fields the cascade actually resolves belong here. `platform`
+    // and `date` are excluded on purpose — neither narrows any dropdown, so
+    // including them would refetch the whole cascade for a change it can't
+    // affect. The `filters` helpers are excluded because they're recreated
+    // every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.draft.business, filters.draft.product, filters.draft.subProduct, filters.draft.journey]);
+  }, [
+    filters.draft.business,
+    filters.draft.product,
+    filters.draft.subProduct,
+    filters.draft.journey,
+    filters.draft.version,
+    filters.draft.month,
+  ]);
 
-  return <FiltersContext.Provider value={{ ...filters, options }}>{children}</FiltersContext.Provider>;
+  return <FiltersContext.Provider value={{ ...filters, options, ready }}>{children}</FiltersContext.Provider>;
 }
 
 export function useFiltersContext(): FiltersContextValue {

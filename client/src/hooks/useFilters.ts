@@ -159,25 +159,30 @@ export function useFilters(dateRange?: DateRange) {
   }
 
   // System-driven correction, not a user edit in progress — see the block
-  // comment above. Only reaches `filters` immediately while the modal is
-  // closed (nothing pending to protect); while it's open, this stays
-  // draft-only just like every other field edit, so it still needs Apply.
-  function correctField<K extends keyof FilterState>(key: K, value: FilterState[K]) {
-    setDraft((f) => ({ ...f, [key]: value }));
+  // comment above. Takes the server's whole corrected selection (plus, when
+  // the date needs re-defaulting for a new business/product/subProduct
+  // combo, that too) and merges it in ONE update.
+  //
+  // Doing it as one merge rather than a setter per field is the point: this
+  // used to be called once per invalid field, and every one of those calls
+  // was a separate state change that re-ran FiltersContext's effect *and*
+  // (while the modal was closed) every page's fetch effect. A single load
+  // could correct three fields and so fetch each page endpoint three times.
+  // Now the corrections arrive together and land together, so page data is
+  // requested once.
+  //
+  // Only reaches `filters` while the modal is closed (nothing pending to
+  // protect — this is the app repairing a default nobody chose); while it's
+  // open the correction stays draft-only like every other field edit, so it
+  // still waits for Apply and can't sneak a page refetch in ahead of it.
+  function applyResolvedSelection(next: Partial<FilterState>) {
+    setDraft((f) => ({ ...f, ...next }));
     if (!open) {
-      setFilters((f) => ({ ...f, [key]: value }));
+      setFilters((f) => ({ ...f, ...next }));
     }
-  }
-
-  // Same reasoning as correctField, plus moving the calendar view to the
-  // corrected date's month so the (if open) modal and the corrected date
-  // never disagree about which month is showing.
-  function correctDate(iso: string) {
-    setDraft((f) => ({ ...f, date: iso }));
-    if (!open) {
-      setFilters((f) => ({ ...f, date: iso }));
-    }
-    jumpToViewMonth(iso);
+    // Keeps the calendar on the corrected date's month, so an open modal and
+    // the corrected date never disagree about which month is showing.
+    if (next.date) jumpToViewMonth(next.date);
   }
 
   function shiftMonth(n: number) {
@@ -267,8 +272,7 @@ export function useFilters(dateRange?: DateRange) {
     set,
     applyFilters,
     cancelEdits,
-    correctField,
-    correctDate,
+    applyResolvedSelection,
     chips,
     appliedCount,
     // The modal's own DATE readout and month header — both reflect the

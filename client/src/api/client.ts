@@ -10,28 +10,40 @@ import type {
   TrendsData,
 } from "./types";
 
-async function getJson<T>(path: string): Promise<T> {
-  const res = await fetch(path);
+async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
+  const res = await fetch(path, signal ? { signal } : undefined);
   if (!res.ok) {
     throw new Error(`${path} responded with ${res.status}`);
   }
   return res.json() as Promise<T>;
 }
 
-// `selection` is whatever's currently picked for business/product/subProduct
-// /journey (all optional — pass what you have). The backend uses it to
-// narrow every field *below* the deepest one supplied, so e.g. passing just
-// `{ business }` comes back with product/subProduct/journey/version options
-// scoped to that business. Omit it entirely for the unfiltered, top-level
-// lists (what the modal shows before anything's been picked).
-export function fetchFilterOptions(selection?: Partial<FilterSelection>): Promise<FilterOptions> {
+// `selection` is whatever's currently picked (all optional — pass what you
+// have). The backend uses it to narrow every field *below* the deepest one
+// supplied, so e.g. passing just `{ business }` comes back with product/
+// subProduct/journey/version options scoped to that business. Omit it
+// entirely for the unfiltered, top-level lists (what the modal shows before
+// anything's been picked).
+//
+// The response also carries a `selection` of its own: the same values,
+// validated top-down and corrected wherever one didn't exist under its
+// (already-corrected) parent. That's what lets the caller settle the whole
+// cascade from a single request — pass `signal` so an in-flight request can
+// be abandoned the moment a newer selection supersedes it, rather than
+// piling up round trips the user has already clicked past.
+export function fetchFilterOptions(
+  selection?: Partial<FilterSelection>,
+  signal?: AbortSignal,
+): Promise<FilterOptions> {
   const params = new URLSearchParams();
   if (selection?.business) params.set("business", selection.business);
   if (selection?.product) params.set("product", selection.product);
   if (selection?.subProduct) params.set("subProduct", selection.subProduct);
   if (selection?.journey) params.set("journey", selection.journey);
+  if (selection?.version) params.set("version", selection.version);
+  if (selection?.month) params.set("month", selection.month);
   const qs = params.toString();
-  return getJson(`/api/filters${qs ? `?${qs}` : ""}`);
+  return getJson(`/api/filters${qs ? `?${qs}` : ""}`, signal);
 }
 
 export function fetchOverview(filters: FilterState): Promise<OverviewData> {

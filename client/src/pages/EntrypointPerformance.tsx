@@ -47,6 +47,11 @@ export default function EntrypointPerformance() {
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    // Hold off until the filter cascade has validated the selection —
+    // fetching for the provisional DEFAULTS and then again for the
+    // corrected values doubled every cold load's requests (see
+    // FiltersContext's `ready`).
+    if (!filters.ready) return;
     setError(null);
     fetchFunnelEntrypoints(funnelId, filters.filters)
       .then(setData)
@@ -56,7 +61,7 @@ export default function EntrypointPerformance() {
     // ignored the Filters button/bar entirely, so it always showed
     // whichever fixture entrypoints.json happened to have for `funnelId`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [funnelId, filters.filters, reloadKey]);
+  }, [funnelId, filters.ready, filters.filters, reloadKey]);
 
   if (error) {
     return <LoadError message={error} onRetry={() => setReloadKey((k) => k + 1)} />;

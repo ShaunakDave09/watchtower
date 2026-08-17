@@ -1,5 +1,7 @@
 import logging
 import os
+import threading
+import time
 from typing import Optional
 
 from psycopg.rows import dict_row
@@ -54,6 +56,87 @@ ENTRYPOINT_FUNNEL_TABLE = os.environ.get(
 # auto-selecting an arbitrary real journey/version, so the dashboard starts
 # aggregated across all of them until the user picks a specific one.
 ALL_VALUE = "All"
+
+# The three fields the filter panel lets you leave unset (journey/version/
+# month). ALL_VALUE is always a legitimate selection for them, so cascade
+# resolution must never "correct" it away to an arbitrary real value the way
+# it does for a genuinely invalid pick.
+OPTIONAL_FILTER_KEYS = frozenset({"journey", "version", "month"})
+
+# Every filter dropdown's option list is a DISTINCT scan over the daily
+# table, and the lists are near-static: which businesses/products exist
+# changes when the warehouse gets new data, not between two clicks a second
+# apart. The topmost one (business) isn't even narrowed by anything, so it's
+# the same full-table DISTINCT on every single call. Caching them per
+# (column, upstream-selection) for a few minutes is what keeps opening the
+# filter modal from re-scanning the fact table once per dropdown.
+FILTER_OPTIONS_CACHE_TTL_SECONDS = float(
+    os.environ.get("FILTER_OPTIONS_CACHE_TTL_SECONDS", "300")
+)
+_filter_cache: dict[tuple, tuple[float, object]] = {}
+_filter_cache_lock = threading.Lock()
+
+# Sentinel distinguishing "cached value is None/empty" from "not cached" —
+# a plain `if cached:` would re-query every time a field legitimately has no
+# options, which is exactly the combination that's slowest to discover.
+_CACHE_MISS = object()
+
+
+def clear_filter_options_cache() -> None:
+    """Drop every cached dropdown list / date range. Nothing in the app calls
+    this during normal operation — it exists so a test (or a REPL session) can
+    force the next lookup to hit Postgres again instead of waiting out the
+    TTL."""
+    with _filter_cache_lock:
+        _filter_cache.clear()
+
+
+def _cache_get(key: tuple):
+    with _filter_cache_lock:
+        cached = _filter_cache.get(key)
+        if cached is not None and time.monotonic() - cached[0] < FILTER_OPTIONS_CACHE_TTL_SECONDS:
+            return cached[1]
+    return _CACHE_MISS
+
+
+def _cache_put(key: tuple, value: object) -> None:
+    with _filter_cache_lock:
+        _filter_cache[key] = (time.monotonic(), value)
+
+
+def _distinct_column_options(cur, column: str, upstream: list[tuple[str, str]]) -> list[str]:
+    """DISTINCT non-null values of `column`, narrowed by `upstream` (already-
+    resolved (column, value) pairs from higher in the cascade), memoized for
+    FILTER_OPTIONS_CACHE_TTL_SECONDS.
+
+    upper()/upper() on both sides for the same reason as the funnel-steps
+    queries: a value selected earlier in the cascade can be cased differently
+    from the row that's actually in the table.
+    """
+    key = ("distinct", column, tuple(upstream))
+    cached = _cache_get(key)
+    if cached is not _CACHE_MISS:
+        return cached  # type: ignore[return-value]
+
+    where_clauses = [f'"{column}" IS NOT NULL']
+    params: dict[str, str] = {}
+    for i, (upstream_column, value) in enumerate(upstream):
+        param_name = f"upstream_{i}"
+        where_clauses.append(f'upper("{upstream_column}") = upper(%({param_name})s)')
+        params[param_name] = value
+
+    cur.execute(
+        f"""
+        SELECT DISTINCT "{column}"
+        FROM {HORIZONTAL_SUMMARY_TABLE}
+        WHERE {" AND ".join(where_clauses)}
+        ORDER BY "{column}"
+        """,
+        params,
+    )
+    values = [row[0] for row in cur.fetchall()]
+    _cache_put(key, values)
+    return values
 
 
 def _rows_to_steps(rows: list[dict]) -> list[dict]:
@@ -121,12 +204,21 @@ def fetch_date_range(*, business: str, product: str, sub_product: str) -> dict:
     business/product/sub_product range and simply see "no data" if their
     own combination doesn't actually have data that day, same as every
     other filter.
+
+    Memoized on the same TTL as the dropdown lists (see
+    _distinct_column_options): this runs on every /api/filters call, and a
+    MIN/MAX over the fact table is not something to repeat for an unchanged
+    business/product/sub_product between two clicks.
     """
     params = {
         "business": business.upper(),
         "product": product.upper(),
         "sub_product": sub_product.upper(),
     }
+    cache_key = ("date_range", params["business"], params["product"], params["sub_product"])
+    cached = _cache_get(cache_key)
+    if cached is not _CACHE_MISS:
+        return cached  # type: ignore[return-value]
 
     query = f"""
         SELECT MIN("DATE") AS min_date, MAX("DATE") AS max_date
@@ -141,10 +233,12 @@ def fetch_date_range(*, business: str, product: str, sub_product: str) -> dict:
         with conn.cursor() as cur:
             cur.execute(query, params)
             min_date, max_date = cur.fetchone()
-    return {
+    date_range = {
         "min": _from_table_date(str(min_date)) if min_date is not None else None,
         "max": _from_table_date(str(max_date)) if max_date is not None else None,
     }
+    _cache_put(cache_key, date_range)
+    return date_range
 
 
 def _to_partition_month(iso_month: str) -> str:
@@ -164,7 +258,17 @@ def fetch_month_options() -> list[str]:
     narrows its fields: this only tells you which months exist *at all*, not
     which ones have data for the current selection — the funnel query itself
     is what surfaces a genuinely empty result for a bad combination.
+
+    Memoized on the same TTL as the dropdown lists. Taking no arguments, this
+    is the most obviously repeated query of the lot: an unnarrowed DISTINCT
+    over the monthly table returning the identical answer on every single
+    /api/filters call.
     """
+    cache_key = ("month_options",)
+    cached = _cache_get(cache_key)
+    if cached is not _CACHE_MISS:
+        return cached  # type: ignore[return-value]
+
     query = f"""
         SELECT DISTINCT "PARTITIONCOL"
         FROM {MONTHLY_SUMMARY_TABLE}
@@ -177,7 +281,9 @@ def fetch_month_options() -> list[str]:
         with conn.cursor() as cur:
             cur.execute(query)
             rows = cur.fetchall()
-    return [f"{str(row[0])[:4]}-{str(row[0])[4:]}" for row in rows]
+    months = [f"{str(row[0])[:4]}-{str(row[0])[4:]}" for row in rows]
+    _cache_put(cache_key, months)
+    return months
 
 
 def fetch_month_funnel_steps(
@@ -652,46 +758,73 @@ FILTER_COLUMNS: list[tuple[str, str]] = [
 ]
 
 
+def correct_selection(key: str, current: Optional[str], values: list[str]) -> Optional[str]:
+    """The one-field version of the cascade correction the frontend used to
+    do across a separate HTTP round trip per level: given a field's real
+    options, return what it should actually be set to.
+
+    Unset (None) resolves to ALL_VALUE for the three optional fields and to
+    the first real option for the rest, so a caller that sends no selection
+    at all still gets back a complete, valid one. A value that isn't among
+    `values` is replaced by the first real option — except ALL_VALUE on an
+    optional field, which is always legitimate and left alone. Returns
+    `current` unchanged when there's nothing to fix.
+    """
+    optional = key in OPTIONAL_FILTER_KEYS
+    if current is None:
+        return ALL_VALUE if optional else (values[0] if values else None)
+    if optional and current == ALL_VALUE:
+        return current
+    if current in values:
+        return current
+    # Genuinely invalid. Prefer a real option; fall back to ALL_VALUE only
+    # when this field has no real options at all *and* is allowed to be
+    # unset (e.g. a combination with no journeys recorded against it).
+    if values:
+        return values[0]
+    return ALL_VALUE if optional else current
+
+
 def fetch_filter_options(
     *,
     business: Optional[str] = None,
     product: Optional[str] = None,
     sub_product: Optional[str] = None,
     journey: Optional[str] = None,
+    version: Optional[str] = None,
 ) -> dict:
-    """Distinct, non-null values for each filter dropdown, straight from the
-    warehouse — optionally narrowed by whatever the caller already has
-    selected upstream in the cascade.
+    """Resolves the *entire* filter cascade in one call: every dropdown's
+    real option list, plus the corrected selection those lists imply.
 
-    `business`/`product`/`sub_product`/`journey` are the *currently selected*
-    values for those fields (or None if nothing's selected yet). Each of
-    them constrains every column that comes after it in FILTER_COLUMNS: e.g.
-    passing business="Retail" narrows the product, sub-product, journey, and
-    version lists to rows where BUSINESS = 'Retail', but the business list
-    itself stays unfiltered (it's the top of the hierarchy, nothing narrows
-    it). This mirrors how a human would explore the data top-down, and it's
-    exactly what the frontend needs to keep the dropdowns from ever showing
-    a combination that doesn't actually exist together.
+    Each field's options are narrowed by the fields above it in
+    FILTER_COLUMNS: business="Retail" narrows product/sub-product/journey/
+    version to rows where BUSINESS = 'Retail', while the business list itself
+    stays unfiltered (nothing narrows the top of the hierarchy). ALL_VALUE
+    means "nothing selected for this field," same as None, and must not
+    narrow anything downstream — otherwise journey="All" would filter version
+    options down to rows literally matching Journey_name = 'All', i.e. none.
 
-    Shape of the return value matches FilterOptions exactly, so the router
-    can return this (or the fixture) with no frontend changes either way.
+    The important part is that correction happens *inside* this loop, so each
+    level is validated against options computed from the already-corrected
+    levels above it. The frontend used to get the same guarantee by fixing
+    one field per response and re-requesting — correct, but it made picking a
+    business a serial chain of HTTP round trips, with the product list
+    unresolved until the second reply and sub-product until the third. Doing
+    it here collapses that chain into a single request over a single pooled
+    connection, and `_distinct_column_options`' cache means the repeated
+    levels usually cost nothing.
 
-    The number of upstream fields narrowing each column varies (0 for
-    business, up to 4 for version), so unlike the fixed-shape funnel-steps
-    queries above, this one genuinely needs to build its WHERE clause in a
-    loop rather than as literal `if` blocks — the loop and its `where_clauses`
-    list are local to this one function, not a shared predicate helper.
+    Returns {"options": {...}, "selection": {...}}: `options` matches
+    FilterOptions' cascade keys, and `selection` is what the caller should
+    actually have selected (`platform`/`date`/`month` aren't part of this
+    cascade and are left to the router/caller).
     """
-    # Selected values, keyed by FilterOptions key, in cascade order — used
-    # below to build the WHERE clause for each column from whatever's
-    # already been picked "above" it.
-    selected: dict[str, Optional[str]] = {
+    selection: dict[str, Optional[str]] = {
         "business": business,
         "product": product,
         "subProduct": sub_product,
         "journey": journey,
-        # "version" has nothing after it to narrow, so it's never a filter
-        # input here — only an output.
+        "version": version,
     }
 
     pool = db.get_connection()
@@ -699,37 +832,13 @@ def fetch_filter_options(
     with pool.connection() as conn:
         with conn.cursor() as cur:
             for i, (key, column) in enumerate(FILTER_COLUMNS):
-                # Only the fields *above* this one in the cascade (i.e.
-                # earlier in FILTER_COLUMNS) narrow its options, and only
-                # when the caller actually selected something for them.
-                # "All" (only ever passed for journey — see ALL_VALUE) means
-                # "nothing selected for this field," same as None: it must
-                # not narrow anything downstream, or e.g. picking journey =
-                # "All" would filter version options down to rows literally
-                # matching Journey_name = 'All' (i.e. none).
                 upstream = [
-                    (upstream_column, selected[upstream_key])
+                    (upstream_column, selection[upstream_key])
                     for upstream_key, upstream_column in FILTER_COLUMNS[:i]
-                    if selected.get(upstream_key) and selected[upstream_key] != ALL_VALUE
+                    if selection.get(upstream_key) and selection[upstream_key] != ALL_VALUE
                 ]
+                values = _distinct_column_options(cur, column, upstream)
+                options[key] = values
+                selection[key] = correct_selection(key, selection.get(key), values)
 
-                # upper()/upper() for the same reason as the funnel-steps
-                # queries: the value selected earlier in the cascade can be
-                # cased differently from the row that's actually in the table.
-                where_clauses = [f'"{column}" IS NOT NULL']
-                params: dict[str, str] = {}
-                for j, (upstream_column, value) in enumerate(upstream):
-                    param_name = f"upstream_{j}"
-                    where_clauses.append(f'upper("{upstream_column}") = upper(%({param_name})s)')
-                    params[param_name] = value
-
-                query = f"""
-                    SELECT DISTINCT "{column}"
-                    FROM {HORIZONTAL_SUMMARY_TABLE}
-                    WHERE {" AND ".join(where_clauses)}
-                    ORDER BY "{column}"
-                """
-                cur.execute(query, params)
-
-                options[key] = [row[0] for row in cur.fetchall()]
-    return options
+    return {"options": options, "selection": selection}
