@@ -154,6 +154,10 @@ export interface EntrypointSource {
   id: string;
   name: string;
   entered: number;
+  // This entrypoint_group's % contribution to the total PDP views across
+  // every group (PDP_VIEW_EP_CONTRI_PCT) — what ConvergenceDiagram sizes
+  // each converging line by, instead of raw `entered` volume.
+  contributionPct: number;
   quality: number;
   tier: "high" | "mid" | "low";
 }
@@ -162,7 +166,11 @@ export interface EntrypointBySource {
   id: string;
   name: string;
   quality: number;
-  stages: { label: string; users: number }[];
+  // entrypoint_wise_funnel is session-level, not user-level, so these are
+  // session counts (derived from that group's own PDP_VIEW_PCT/PDP_CLICK_PCT/
+  // FORM1_VIEW_PCT/FORM1_CLICK_PCT columns) — named `sessions`, not `users`,
+  // to match.
+  stages: { label: string; sessions: number }[];
 }
 
 export interface EntrypointData {

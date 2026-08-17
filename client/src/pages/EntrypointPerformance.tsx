@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { fetchFunnelEntrypoints } from "../api/client";
 import type { EntrypointData } from "../api/types";
+import { useFiltersContext } from "../context/FiltersContext";
 import Panel from "../components/ui/Panel";
 import ConvergenceDiagram from "../components/entrypoints/ConvergenceDiagram";
 import SourceFunnelCard from "../components/entrypoints/SourceFunnelCard";
@@ -39,6 +40,7 @@ function ExtremeCard({
 export default function EntrypointPerformance() {
   const { funnelId = "guest-checkout" } = useParams();
   const navigate = useNavigate();
+  const filters = useFiltersContext();
   const [data, setData] = useState<EntrypointData | null>(null);
   const [range, setRange] = useState<"30d" | "7d">("30d");
   const [error, setError] = useState<string | null>(null);
@@ -46,10 +48,15 @@ export default function EntrypointPerformance() {
 
   useEffect(() => {
     setError(null);
-    fetchFunnelEntrypoints(funnelId)
+    fetchFunnelEntrypoints(funnelId, filters.filters)
       .then(setData)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
-  }, [funnelId, reloadKey]);
+    // Refetch whenever any active filter or the selected date changes —
+    // same dependency shape as Funnel Detail. Previously this page's fetch
+    // ignored the Filters button/bar entirely, so it always showed
+    // whichever fixture entrypoints.json happened to have for `funnelId`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [funnelId, filters.filters, reloadKey]);
 
   if (error) {
     return <LoadError message={error} onRetry={() => setReloadKey((k) => k + 1)} />;
@@ -130,7 +137,7 @@ export default function EntrypointPerformance() {
 
       <Panel className="mb-4 overflow-x-auto p-[22px]">
         <div className="mb-4 flex items-baseline gap-3">
-          <div className="text-[15px] font-semibold text-[var(--color-ink)]">Where users come from</div>
+          <div className="text-[15px] font-semibold text-[var(--color-ink)]">Where sessions come from</div>
           <div className="flex-1" />
           <div className="flex items-center gap-[14px] font-mono text-[10px] text-[var(--color-faint)]">
             <span className="flex items-center gap-[5px]">
